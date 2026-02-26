@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Invalid password" });
   }
 
-  const hash = process.env.APP_PASSWORD_HASH;
+  const hash = (process.env.APP_PASSWORD_HASH || "").trim();
   if (!hash) {
     console.error("APP_PASSWORD_HASH environment variable is not set");
     return res.status(500).json({ error: "Server configuration error" });
