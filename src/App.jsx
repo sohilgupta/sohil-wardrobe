@@ -1,24 +1,93 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T } from "./theme";
-import W from "./data/wardrobe";
+import useWardrobe from "./hooks/useWardrobe";
 import WardrobeTab from "./components/WardrobeTab";
 import TripTab from "./components/TripTab";
 import OutfitTab from "./components/OutfitTab";
 import AddTab from "./components/AddTab";
 import PackTab from "./components/PackTab";
+import OutfitsTab from "./components/OutfitsTab";
+import LoginPage from "./components/LoginPage";
 
 const NAV = [
   { id: "wardrobe", icon: "⊞", label: "WARDROBE" },
-  { id: "trip", icon: "✈", label: "TRIP" },
-  { id: "outfit", icon: "✦", label: "OUTFIT AI" },
-  { id: "add", icon: "+", label: "ADD" },
-  { id: "packing", icon: "⊛", label: "PACKING" },
+  { id: "trip",     icon: "✈", label: "TRIP" },
+  { id: "daily",    icon: "◫", label: "DAILY" },
+  { id: "outfit",   icon: "✦", label: "OUTFIT AI" },
+  { id: "add",      icon: "+", label: "ADD" },
+  { id: "packing",  icon: "⊛", label: "PACKING" },
 ];
 
-/* ─── ROOT ─────────────────────────────────────────────────────────────────── */
+const CACHE_KEYS = ["wdb_cache_v3", "wdb_overrides_v2", "wdb_drive_matches_v1"];
+
+/* ─── ROOT — handles auth state before rendering anything sensitive ────────── */
 export default function App() {
+  // "checking" | "authenticated" | "unauthenticated"
+  const [authState, setAuthState] = useState("checking");
+
+  useEffect(() => {
+    fetch("/api/auth/check")
+      .then(async (r) => {
+        if (!r.ok) { setAuthState("unauthenticated"); return; }
+        // Parse JSON to confirm a real auth response (not an SPA HTML fallback)
+        try {
+          const data = await r.json();
+          setAuthState(data.authenticated === true ? "authenticated" : "unauthenticated");
+        } catch {
+          setAuthState("unauthenticated");
+        }
+      })
+      .catch(() => setAuthState("unauthenticated"));
+  }, []);
+
+  if (authState === "checking") {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: T.bg,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
+        }}
+      >
+        <p style={{ fontSize: 10, color: T.light, letterSpacing: 3, fontWeight: 600 }}>
+          LOADING…
+        </p>
+      </div>
+    );
+  }
+
+  if (authState === "unauthenticated") {
+    return <LoginPage onLogin={() => setAuthState("authenticated")} />;
+  }
+
+  async function handleLogout() {
+    // Clear all local caches before expiring the session cookie
+    CACHE_KEYS.forEach((k) => localStorage.removeItem(k));
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    setAuthState("unauthenticated");
+  }
+
+  return <AuthenticatedApp onLogout={handleLogout} />;
+}
+
+/* ─── AUTHENTICATED APP — only mounts after auth check passes ─────────────── */
+function AuthenticatedApp({ onLogout }) {
   const [tab, setTab] = useState("wardrobe");
-  const [wardrobe, setWardrobe] = useState(W);
+
+  const {
+    items:      wardrobe,
+    loading:    wLoading,
+    syncStatus,
+    lastSync,
+    sync,
+    editItem,
+    deleteItem,
+    addItem,
+  } = useWardrobe();
+
   const travel = wardrobe.filter((i) => i.t === "Yes").length;
 
   return (
@@ -41,6 +110,7 @@ export default function App() {
         button:active{transform:scale(0.98);}
         body{background:${T.bg};color:${T.text};}
         ::placeholder{color:${T.light};}
+        @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
       `}</style>
 
       {/* Header */}
@@ -75,10 +145,10 @@ export default function App() {
                 SOHIL-WARDROBE
               </span>
               <span style={{ fontSize: 10, color: T.light, letterSpacing: 2, fontWeight: 600 }}>
-                AU·NZ 2026
+                AUS·NZ 2026
               </span>
             </div>
-            <div style={{ display: "flex", gap: 16 }}>
+            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
               <div style={{ textAlign: "center" }}>
                 <p style={{ fontSize: 14, fontWeight: 700, color: T.text, lineHeight: 1 }}>
                   {wardrobe.length}
@@ -86,9 +156,29 @@ export default function App() {
                 <p style={{ fontSize: 8, color: T.light, letterSpacing: 1, marginTop: 1 }}>ITEMS</p>
               </div>
               <div style={{ textAlign: "center" }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: T.green, lineHeight: 1 }}>{travel}</p>
+                <p style={{ fontSize: 14, fontWeight: 700, color: T.green, lineHeight: 1 }}>
+                  {travel}
+                </p>
                 <p style={{ fontSize: 8, color: T.light, letterSpacing: 1, marginTop: 1 }}>TRAVEL</p>
               </div>
+              {/* Logout */}
+              <button
+                onClick={onLogout}
+                title="Log out"
+                style={{
+                  background: "none",
+                  border: `1px solid ${T.border}`,
+                  borderRadius: 6,
+                  color: T.light,
+                  fontSize: 9,
+                  fontWeight: 600,
+                  letterSpacing: 1,
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                }}
+              >
+                EXIT
+              </button>
             </div>
           </div>
           <div style={{ display: "flex", borderTop: `1px solid ${T.borderLight}` }}>
@@ -141,11 +231,23 @@ export default function App() {
 
       {/* Content */}
       <div style={{ maxWidth: 700, margin: "0 auto", padding: "20px 16px 100px" }}>
-        {tab === "wardrobe" && <WardrobeTab wardrobe={wardrobe} />}
-        {tab === "trip" && <TripTab wardrobe={wardrobe} />}
-        {tab === "outfit" && <OutfitTab wardrobe={wardrobe} />}
-        {tab === "add" && <AddTab onAdd={(item) => setWardrobe((w) => [...w, item])} />}
-        {tab === "packing" && <PackTab wardrobe={wardrobe} />}
+        {tab === "wardrobe" && (
+          <WardrobeTab
+            wardrobe={wardrobe}
+            loading={wLoading}
+            syncStatus={syncStatus}
+            lastSync={lastSync}
+            onSync={sync}
+            onEdit={editItem}
+            onDelete={deleteItem}
+            onAdd={addItem}
+          />
+        )}
+        {tab === "trip"    && <TripTab    wardrobe={wardrobe} />}
+        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} />}
+        {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} />}
+        {tab === "add"     && <AddTab     onAdd={addItem} />}
+        {tab === "packing" && <PackTab    wardrobe={wardrobe} />}
       </div>
     </div>
   );

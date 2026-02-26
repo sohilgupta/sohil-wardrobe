@@ -1,6 +1,8 @@
-/* ─── GOOGLE DRIVE IMAGE HELPER ────────────────────────────────────────────── */
+/* ─── GOOGLE DRIVE IMAGE HELPER ─────────────────────────────────────────────
+   Returns the secure image proxy URL — never a raw Drive link in the browser.
+   ─────────────────────────────────────────────────────────────────────────── */
 export function driveImg(fileId) {
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
+  return `/api/image?id=${fileId}`;
 }
 
 /* ─── DARK THEME TOKENS ────────────────────────────────────────────────────── */
@@ -83,6 +85,15 @@ export function swatch(c) {
 }
 
 export const CAT_EMOJI = {
+  // ─ Google Sheets tab names (new data source)
+  Jackets:      "🧥",
+  Shoes:        "👟",
+  Sweaters:     "🧶",
+  Thermals:     "🧣",
+  Shirts:       "👔",
+  "Gym Tshirts":"👕",
+  Bottoms:      "👖",
+  // ─ legacy granular categories (local wardrobe.js)
   Jacket: "🧥",
   "Light Jacket": "🧥",
   Overshirt: "👕",
