@@ -1,7 +1,16 @@
 /* ─── OUTFITS TAB — Outfit per Day ──────────────────────────────────────────
-   Data: wardrobe prop (from useWardrobe hook — single source of truth).
-   Outfits: stored as { [dayId]: { base, mid, outer, bottom, shoes } } where
-            each value is an item ID (or null).  Persisted to localStorage.
+   Data:       wardrobe prop (from useWardrobe hook — single source of truth).
+   outfitIds:  from useOutfits hook in App.jsx — persisted to localStorage + backend.
+   Layout:     Two-column on desktop, stacked + horizontal day scroll on mobile.
+
+   Outfit per day schema:
+   {
+     base:   "itemId" | null,
+     mid:    "itemId" | null | "REMOVED",   // "REMOVED" = user explicitly disabled
+     outer:  "itemId" | null | "REMOVED",
+     bottom: "itemId" | null,
+     shoes:  "itemId" | null,
+   }
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -12,24 +21,24 @@ import OutfitCard from "./OutfitCard";
 import ItemPicker from "./ItemPicker";
 import Chip from "./Chip";
 
-/* ─── localStorage helpers ───────────────────────────────────────────────── */
-const OUTFITS_KEY = "wdb_outfits_v1";
-const loadSavedOutfits = () => {
-  try { return JSON.parse(localStorage.getItem(OUTFITS_KEY)) || {}; }
-  catch { return {}; }
-};
-const persistOutfits = (data) => {
-  try { localStorage.setItem(OUTFITS_KEY, JSON.stringify(data)); } catch {}
-};
+/* ─── Responsive hook ────────────────────────────────────────────────────── */
+function useIsMobile(bp = 640) {
+  const [m, setM] = useState(() => typeof window !== "undefined" && window.innerWidth <= bp);
+  useEffect(() => {
+    const fn = () => setM(window.innerWidth <= bp);
+    window.addEventListener("resize", fn);
+    return () => window.removeEventListener("resize", fn);
+  }, [bp]);
+  return m;
+}
 
 /* ─── Resolve outfit IDs → full items (or missing marker) ───────────────── */
 function resolveOutfit(outfitIds, wardrobe) {
   if (!outfitIds) return null;
   const resolve = (id) => {
-    if (!id) return null;
+    if (!id || id === "REMOVED") return null;
     const item = wardrobe.find((i) => i.id === id);
     if (item) return item;
-    // Item was deleted from wardrobe — surface a "missing" marker
     return { _missing: true, id, n: "Item removed", c: "", col: "Grey", b: "", img: "" };
   };
   return {
@@ -54,10 +63,11 @@ const toIds = (outfit) => ({
 const wColors  = (w) => T.weather[w]  || ["#27272A", "#A1A1AA"];
 const occColors = (o) => T.occ[o]     || ["#27272A", "#A1A1AA"];
 
-/* ─── Day List Row ───────────────────────────────────────────────────────── */
+/* ─── Day List Row (desktop sidebar) ─────────────────────────────────────── */
 function DayRow({ day, active, hasOutfit, hasMissing, onClick }) {
   return (
-    <button onClick={onClick}
+    <button
+      onClick={onClick}
       style={{
         width: "100%", textAlign: "left",
         background: active ? T.alt : "none",
@@ -91,25 +101,103 @@ function DayRow({ day, active, hasOutfit, hasMissing, onClick }) {
   );
 }
 
+/* ─── Day Chip (mobile horizontal strip) ─────────────────────────────────── */
+function DayChip({ day, active, hasOutfit, hasMissing, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        flexShrink: 0,
+        background: active ? T.alt : "transparent",
+        border: `1.5px solid ${active ? T.border : T.borderLight}`,
+        borderRadius: 12,
+        padding: "8px 10px",
+        cursor: "pointer",
+        textAlign: "center",
+        minWidth: 52,
+        transition: "background 0.15s",
+      }}
+    >
+      <div style={{ fontSize: 15, lineHeight: 1 }}>{day.e}</div>
+      <div style={{ fontSize: 8, fontWeight: 700, color: active ? T.text : T.light, marginTop: 3, letterSpacing: 0.5 }}>
+        {day.id.replace("d", "D")}
+      </div>
+      <div style={{
+        width: 5, height: 5, borderRadius: "50%", margin: "4px auto 0",
+        background: hasMissing ? "#FCD34D" : hasOutfit ? T.green : T.borderLight,
+      }} />
+    </button>
+  );
+}
+
+/* ─── Layer Toggle Button ─────────────────────────────────────────────────── */
+function LayerBtn({ active, label, onAdd, onRemove }) {
+  const base = {
+    padding: "3px 10px",
+    borderRadius: 20,
+    fontSize: 9,
+    fontWeight: 700,
+    letterSpacing: 1,
+    cursor: "pointer",
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    fontFamily: "inherit",
+    transition: "all 0.15s",
+    background: "none",
+  };
+  if (active) {
+    return (
+      <button
+        onClick={onRemove}
+        style={{ ...base, border: `1.5px solid ${T.border}`, color: T.mid }}
+        title={`Remove ${label} layer`}
+      >
+        <span style={{ color: T.text }}>{label.toUpperCase()}</span>
+        <span style={{ fontSize: 8, opacity: 0.6 }}>✕</span>
+      </button>
+    );
+  }
+  return (
+    <button
+      onClick={onAdd}
+      style={{ ...base, border: `1.5px dashed ${T.borderLight}`, color: T.light }}
+      title={`Add ${label} layer`}
+    >
+      <span>+</span>
+      <span>{label.toUpperCase()}</span>
+    </button>
+  );
+}
+
 /* ─── OUTFITS TAB ─────────────────────────────────────────────────────────── */
 // Props:
-//   wardrobe  – normalized items array from useWardrobe (single source of truth)
-//   loading   – boolean (wardrobe still loading)
-export default function OutfitsTab({ wardrobe = [], loading = false }) {
-  const [outfitIds, setOutfitIds] = useState(loadSavedOutfits); // { dayId → { base, mid, outer, bottom, shoes } }
+//   wardrobe      – normalized items array from useWardrobe (single source of truth)
+//   loading       – boolean (wardrobe still loading)
+//   outfitIds     – { [dayId]: { base, mid, outer, bottom, shoes } } from useOutfits
+//   setOutfitIds  – setter from useOutfits (handles localStorage + backend sync)
+export default function OutfitsTab({ wardrobe = [], loading = false, outfitIds = {}, setOutfitIds }) {
   const [selectedDay, setSelectedDay] = useState(TRIP[0]);
   const [genLoading,  setGenLoading]  = useState(null);
+  const isMobile = useIsMobile();
 
   /* picker state */
-  const [pickerLayer, setPickerLayer] = useState(null); // "base"|"mid"|"outer"|"bottom"|"shoes" | null
+  const [pickerLayer, setPickerLayer] = useState(null);
   const pickerOpen = pickerLayer !== null;
 
   const usedIds = useRef(new Set());
 
+  /* ── Helper: does a day have a real outfit (not just REMOVED markers)? ── */
+  const isPlannedDay = (dayId) => {
+    const ids = outfitIds[dayId];
+    if (!ids) return false;
+    return Object.values(ids).some((v) => v && v !== "REMOVED");
+  };
+
   /* ── Auto-generate when day is selected and wardrobe is ready ── */
   useEffect(() => {
     if (!selectedDay || wardrobe.length === 0) return;
-    if (outfitIds[selectedDay.id]) return; // already planned
+    if (isPlannedDay(selectedDay.id)) return; // already has a real outfit
     generateForDay(selectedDay);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDay?.id, wardrobe.length]);
@@ -120,22 +208,30 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
       if (!day || wardrobe.length === 0) return;
       setGenLoading(day.id);
 
-      // Collect IDs used on other days
+      // Collect IDs used on other days (exclude REMOVED sentinels)
       const otherUsed = new Set();
       Object.entries(outfitIds).forEach(([dId, ids]) => {
-        if (dId !== day.id) Object.values(ids).forEach((id) => id && otherUsed.add(id));
+        if (dId !== day.id) {
+          Object.values(ids).forEach((id) => id && id !== "REMOVED" && otherUsed.add(id));
+        }
       });
+
+      // Check if user explicitly disabled any optional layers for this day
+      const prevIds     = outfitIds[day.id] || {};
+      const midRemoved  = prevIds.mid   === "REMOVED";
+      const outerRemoved = prevIds.outer === "REMOVED";
 
       setTimeout(() => {
         const outfit = generateOutfit(wardrobe, day, otherUsed);
-        const ids = toIds(outfit);
-        Object.values(ids).forEach((id) => id && usedIds.current.add(id));
+        const ids    = toIds(outfit);
 
-        setOutfitIds((prev) => {
-          const next = { ...prev, [day.id]: ids };
-          persistOutfits(next);
-          return next;
-        });
+        // Restore user's layer removal preferences
+        if (midRemoved)   ids.mid   = "REMOVED";
+        if (outerRemoved) ids.outer = "REMOVED";
+
+        Object.values(ids).forEach((id) => id && id !== "REMOVED" && usedIds.current.add(id));
+
+        setOutfitIds((prev) => ({ ...prev, [day.id]: ids }));
         setGenLoading(null);
       }, 0);
     },
@@ -143,29 +239,38 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
     [wardrobe, outfitIds]
   );
 
-  /* ── Regenerate (force fresh pick) ── */
+  /* ── Regenerate (force fresh pick, preserving REMOVED markers) ── */
   function handleRegenerate() {
     if (!selectedDay) return;
-    // Remove current outfit IDs from usedIds tracker
     const current = outfitIds[selectedDay.id];
-    if (current) Object.values(current).forEach((id) => id && usedIds.current.delete(id));
+
+    // Preserve "REMOVED" markers; release real item IDs from usedIds
+    const preserved = {};
+    if (current) {
+      Object.entries(current).forEach(([k, v]) => {
+        if (v === "REMOVED") preserved[k] = "REMOVED";
+        else if (v) usedIds.current.delete(v);
+      });
+    }
 
     setOutfitIds((prev) => {
       const next = { ...prev };
-      delete next[selectedDay.id];
-      persistOutfits(next);
+      if (Object.keys(preserved).length > 0) {
+        next[selectedDay.id] = preserved; // keep REMOVED prefs, clear items
+      } else {
+        delete next[selectedDay.id];
+      }
       return next;
     });
 
-    // Trigger generation on next render
     setTimeout(() => generateForDay(selectedDay), 0);
   }
 
-  /* ── Swap via auto-algorithm ── (kept for keyboard/power users via OutfitCard ⟳) */
+  /* ── Auto-swap via algorithm ── */
   function handleAutoSwap(layer) {
     if (!selectedDay) return;
     const currentId = outfitIds[selectedDay.id]?.[layer];
-    if (!currentId) return;
+    if (!currentId || currentId === "REMOVED") return;
     const currentItem = wardrobe.find((i) => i.id === currentId);
     if (!currentItem) return;
 
@@ -175,11 +280,10 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
     usedIds.current.delete(currentId);
     usedIds.current.add(next.id);
 
-    setOutfitIds((prev) => {
-      const next2 = { ...prev, [selectedDay.id]: { ...(prev[selectedDay.id] || {}), [layer]: next.id } };
-      persistOutfits(next2);
-      return next2;
-    });
+    setOutfitIds((prev) => ({
+      ...prev,
+      [selectedDay.id]: { ...(prev[selectedDay.id] || {}), [layer]: next.id },
+    }));
   }
 
   /* ── Open ItemPicker for manual selection ── */
@@ -187,18 +291,36 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
     setPickerLayer(layer);
   }
 
+  /* ── Add optional layer: open picker directly ── */
+  function handleAddLayer(layer) {
+    if (!selectedDay) return;
+    setPickerLayer(layer); // picker will set the item; handlePickerSelect clears REMOVED
+  }
+
+  /* ── Remove optional layer: set REMOVED sentinel ── */
+  function handleRemoveLayer(layer) {
+    if (!selectedDay) return;
+    const oldId = outfitIds[selectedDay.id]?.[layer];
+    if (oldId && oldId !== "REMOVED") usedIds.current.delete(oldId);
+
+    setOutfitIds((prev) => ({
+      ...prev,
+      [selectedDay.id]: { ...(prev[selectedDay.id] || {}), [layer]: "REMOVED" },
+    }));
+  }
+
   /* ── Picker confirmed: update outfit ID ── */
   function handlePickerSelect(item) {
     if (!selectedDay || !pickerLayer) return;
     const oldId = outfitIds[selectedDay.id]?.[pickerLayer];
-    if (oldId) usedIds.current.delete(oldId);
+    // Remove old item from tracking (ignore REMOVED sentinel)
+    if (oldId && oldId !== "REMOVED") usedIds.current.delete(oldId);
     usedIds.current.add(item.id);
 
-    setOutfitIds((prev) => {
-      const next = { ...prev, [selectedDay.id]: { ...(prev[selectedDay.id] || {}), [pickerLayer]: item.id } };
-      persistOutfits(next);
-      return next;
-    });
+    setOutfitIds((prev) => ({
+      ...prev,
+      [selectedDay.id]: { ...(prev[selectedDay.id] || {}), [pickerLayer]: item.id },
+    }));
     setPickerLayer(null);
   }
 
@@ -207,13 +329,25 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
   const currentOutfit = currentIds ? resolveOutfit(currentIds, wardrobe) : null;
   const isGenLoading  = genLoading === selectedDay?.id;
   const selectedCount = wardrobe.filter((i) => i.selected).length;
+  const plannedCount  = TRIP.filter((d) => isPlannedDay(d.id)).length;
 
-  // Check if any day's outfit has a missing item
   const hasMissing = (dayId) => {
     const ids = outfitIds[dayId];
     if (!ids) return false;
-    return Object.values(ids).some((id) => id && !wardrobe.find((i) => i.id === id));
+    return Object.values(ids).some(
+      (id) => id && id !== "REMOVED" && !wardrobe.find((i) => i.id === id)
+    );
   };
+
+  // Current day's layer state
+  const midActive   = !!(currentIds?.mid   && currentIds.mid   !== "REMOVED");
+  const outerActive = !!(currentIds?.outer && currentIds.outer !== "REMOVED");
+
+  // ItemPicker currentId — never pass "REMOVED" as a current item
+  const pickerCurrentId =
+    pickerLayer && currentIds?.[pickerLayer] !== "REMOVED"
+      ? currentIds?.[pickerLayer] || null
+      : null;
 
   /* ── Loading state ── */
   if (loading && wardrobe.length === 0) {
@@ -233,36 +367,74 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
           Outfit per Day
         </h2>
         <p style={{ fontSize: 11, color: T.mid }}>
-          AUS & NZ — April 2026 · {TRIP.length} days · {wardrobe.length} wardrobe items
+          AUS & NZ — April 2026 · {plannedCount}/{TRIP.length} planned · {wardrobe.length} items
         </p>
       </div>
 
-      {/* ── Two-panel layout ── */}
-      <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+      {/* ── Layout ── */}
+      <div style={{
+        display: "flex",
+        flexDirection: isMobile ? "column" : "row",
+        gap: 14,
+        alignItems: "flex-start",
+      }}>
 
-        {/* ── Left: Day list ── */}
-        <div style={{ width: 160, flexShrink: 0, background: T.surface, border: `1.5px solid ${T.borderLight}`, borderRadius: 16, overflow: "hidden" }}>
-          <div style={{ padding: "10px 12px 8px", borderBottom: `1px solid ${T.borderLight}`, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light }}>
-            DAYS · {Object.keys(outfitIds).length}/{TRIP.length}
-          </div>
-          <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 260px)", padding: 6 }}>
+        {/* ── Day List ── */}
+        {isMobile ? (
+          /* MOBILE: horizontal scroll strip */
+          <div style={{
+            width: "100%",
+            overflowX: "auto",
+            display: "flex",
+            gap: 6,
+            paddingBottom: 4,
+            WebkitOverflowScrolling: "touch",
+            msOverflowStyle: "none",
+          }}>
             {TRIP.map((day) => (
-              <DayRow
+              <DayChip
                 key={day.id}
                 day={day}
                 active={selectedDay?.id === day.id}
-                hasOutfit={!!outfitIds[day.id]}
+                hasOutfit={isPlannedDay(day.id)}
                 hasMissing={hasMissing(day.id)}
                 onClick={() => setSelectedDay(day)}
               />
             ))}
           </div>
-        </div>
+        ) : (
+          /* DESKTOP: vertical sidebar */
+          <div style={{
+            width: 160,
+            flexShrink: 0,
+            background: T.surface,
+            border: `1.5px solid ${T.borderLight}`,
+            borderRadius: 16,
+            overflow: "hidden",
+          }}>
+            <div style={{ padding: "10px 12px 8px", borderBottom: `1px solid ${T.borderLight}`, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light }}>
+              DAYS · {plannedCount}/{TRIP.length}
+            </div>
+            <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 260px)", padding: 6 }}>
+              {TRIP.map((day) => (
+                <DayRow
+                  key={day.id}
+                  day={day}
+                  active={selectedDay?.id === day.id}
+                  hasOutfit={isPlannedDay(day.id)}
+                  hasMissing={hasMissing(day.id)}
+                  onClick={() => setSelectedDay(day)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ── Right: Outfit panel ── */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, width: "100%" }}>
           {selectedDay ? (
             <div style={{ background: T.surface, border: `1.5px solid ${T.borderLight}`, borderRadius: 16, overflow: "hidden" }}>
+
               {/* Day header */}
               <div style={{ padding: "14px 16px 12px", borderBottom: `1px solid ${T.borderLight}` }}>
                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
@@ -290,7 +462,7 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
               {/* Source indicator */}
               <div style={{ padding: "10px 16px 0", fontSize: 10, color: T.light, display: "flex", alignItems: "center", gap: 5 }}>
                 <span style={{ width: 6, height: 6, borderRadius: "50%", background: T.green, display: "inline-block", flexShrink: 0 }} />
-                {selectedCount} selected / {wardrobe.length} items · tap ⟳ to pick manually
+                {selectedCount} selected / {wardrobe.length} items · tap ⟳ to swap
               </div>
 
               {/* Outfit Card */}
@@ -301,6 +473,27 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
                   onRegenerate={handleRegenerate}
                   loading={isGenLoading}
                 />
+
+                {/* ── Layer controls ── */}
+                {currentIds && !isGenLoading && (
+                  <div style={{ marginTop: 12, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light, marginRight: 2 }}>
+                      LAYERS
+                    </span>
+                    <LayerBtn
+                      active={midActive}
+                      label="Mid"
+                      onAdd={() => handleAddLayer("mid")}
+                      onRemove={() => handleRemoveLayer("mid")}
+                    />
+                    <LayerBtn
+                      active={outerActive}
+                      label="Outer"
+                      onAdd={() => handleAddLayer("outer")}
+                      onRemove={() => handleRemoveLayer("outer")}
+                    />
+                  </div>
+                )}
 
                 {/* Missing item warning */}
                 {hasMissing(selectedDay.id) && (
@@ -321,7 +514,7 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
 
       {/* ── Footer ── */}
       <p style={{ fontSize: 9, color: T.light, textAlign: "center", marginTop: 16, letterSpacing: 0.5 }}>
-        WARDROBE · Google Sheets · Single source of truth · Outfits stored locally by ID
+        WARDROBE · Outfits synced across devices · Single source of truth
       </p>
 
       {/* ── ItemPicker modal ── */}
@@ -329,7 +522,7 @@ export default function OutfitsTab({ wardrobe = [], loading = false }) {
         <ItemPicker
           wardrobe={wardrobe}
           layer={pickerLayer}
-          currentId={outfitIds[selectedDay?.id]?.[pickerLayer] || null}
+          currentId={pickerCurrentId}
           onSelect={handlePickerSelect}
           onClose={() => setPickerLayer(null)}
         />

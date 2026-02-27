@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { T } from "./theme";
 import useWardrobe from "./hooks/useWardrobe";
+import useOutfits from "./hooks/useOutfits";
 import WardrobeTab from "./components/WardrobeTab";
 import TripTab from "./components/TripTab";
 import OutfitTab from "./components/OutfitTab";
@@ -87,6 +88,9 @@ function AuthenticatedApp({ onLogout }) {
     deleteItem,
     addItem,
   } = useWardrobe();
+
+  // Outfit-per-day state — shared between Daily and Packing tabs
+  const { outfitIds, setOutfitIds } = useOutfits();
 
   const travel = wardrobe.filter((i) => i.t === "Yes").length;
 
@@ -244,10 +248,10 @@ function AuthenticatedApp({ onLogout }) {
           />
         )}
         {tab === "trip"    && <TripTab    wardrobe={wardrobe} />}
-        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} />}
+        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} />}
         {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} />}
         {tab === "add"     && <AddTab     onAdd={addItem} />}
-        {tab === "packing" && <PackTab    wardrobe={wardrobe} />}
+        {tab === "packing" && <PackTab    wardrobe={wardrobe} outfitIds={outfitIds} />}
       </div>
     </div>
   );
