@@ -553,17 +553,25 @@ export default function OutfitsTab({
             ))}
           </div>
         ) : (
-          /* DESKTOP: vertical sidebar */
+          /* DESKTOP: vertical sidebar — sticky so it stays in view while scrolling */
           <div style={{
             width: 160, flexShrink: 0,
             background: T.surface,
             border: `1.5px solid ${T.borderLight}`,
             borderRadius: 16, overflow: "hidden",
+            // Sticky + height capped to viewport minus the fixed header (~90px)
+            // This keeps the sidebar full-size even at high browser zoom levels
+            position: "sticky",
+            top: 90,
+            alignSelf: "flex-start",
+            maxHeight: "calc(100vh - 110px)",
+            display: "flex",
+            flexDirection: "column",
           }}>
-            <div style={{ padding: "10px 12px 8px", borderBottom: `1px solid ${T.borderLight}`, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light }}>
+            <div style={{ padding: "10px 12px 8px", borderBottom: `1px solid ${T.borderLight}`, fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light, flexShrink: 0 }}>
               DAYS · {plannedCount}/{TRIP.length}
             </div>
-            <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)", padding: 6 }}>
+            <div style={{ overflowY: "auto", flex: 1, padding: 6 }}>
               {TRIP.map((day) => (
                 <DayRow
                   key={day.id}
