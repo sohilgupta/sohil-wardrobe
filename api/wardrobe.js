@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     TABS.map(async (tab) => {
       const url =
         `https://docs.google.com/spreadsheets/d/${sheetId}` +
-        `/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(tab)}`;
+        `/gviz/tq?tqx=out:json&headers=1&sheet=${encodeURIComponent(tab)}`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error(`Tab "${tab}" HTTP ${response.status}`);

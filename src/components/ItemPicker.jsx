@@ -164,7 +164,13 @@ export default function ItemPicker({ wardrobe, layer, currentId, onSelect, onClo
   /* Filter: tab → layer, then search */
   const filtered = useMemo(() => {
     const pool = allowedTabs.length
-      ? wardrobe.filter((i) => allowedTabs.includes(i.c || i.category))
+      // Match by _tab (source sheet name) first, then fall back to c/category.
+      // This ensures items whose `c` is a subcategory (e.g. "Linen Pants" from
+      // the Bottoms sheet) still appear when picking a bottom-layer slot.
+      ? wardrobe.filter((i) =>
+          allowedTabs.includes(i._tab) ||
+          allowedTabs.includes(i.c || i.category)
+        )
       : wardrobe;
 
     if (!q.trim()) return pool;
