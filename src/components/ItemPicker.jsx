@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { T, swatch, CAT_EMOJI } from "../theme";
+import TRIP from "../data/trip";
 
 /* ─── Layer filter functions ──────────────────────────────────────────────────
    Filter wardrobe items for each outfit layer slot.
@@ -7,7 +8,7 @@ import { T, swatch, CAT_EMOJI } from "../theme";
    rather than tab names — so footwear/bottom overrides flow through automatically.
 
    Base also includes Sweaters tab items (pullovers/crewnecks worn as the
-   primary visible top), since a sweatshirt or crewneck is a valid base layer.
+   primary visible top, since a sweatshirt or crewneck is a valid base layer.
    ─────────────────────────────────────────────────────────────────────────── */
 export const LAYER_FILTER = {
   base:   (i) => i.l === "Base" || i._tab === "Sweaters",
@@ -25,17 +26,68 @@ const LAYER_LABELS = {
   shoes:  "Shoes",
 };
 
+/* ─── Usage stats precomputation ─────────────────────────────────────────────
+   Iterates all outfitIds to build per-item stats:
+     count     – total appearances across all days + slots
+     inFrozen  – appears in at least one frozen day
+     inAny     – appears in any planned day
+     inRecent  – in the first 3 TRIP days that have outfits planned
+                 (proxy for "recently planned" since trips are built sequentially)
+   ─────────────────────────────────────────────────────────────────────────── */
+function computeUsageStats(outfitIds, frozenDays) {
+  const stats = {};
+
+  const recentDayIds = new Set(
+    TRIP.filter((d) => outfitIds[d.id])
+      .slice(0, 3)
+      .map((d) => d.id)
+  );
+
+  Object.entries(outfitIds).forEach(([dayId, dayData]) => {
+    if (!dayData) return;
+    const isFrozen = frozenDays[dayId] === true;
+    const isRecent = recentDayIds.has(dayId);
+
+    const processSlot = (slotIds) => {
+      if (!slotIds || typeof slotIds !== "object") return;
+      Object.values(slotIds).forEach((itemId) => {
+        if (!itemId || itemId === "REMOVED") return;
+        if (!stats[itemId]) {
+          stats[itemId] = { count: 0, inFrozen: false, inAny: false, inRecent: false };
+        }
+        stats[itemId].count++;
+        stats[itemId].inAny = true;
+        if (isFrozen) stats[itemId].inFrozen = true;
+        if (isRecent) stats[itemId].inRecent = true;
+      });
+    };
+
+    processSlot(dayData.daytime);
+    processSlot(dayData.evening);
+  });
+
+  return stats;
+}
+
+function itemScore(s) {
+  if (!s) return 0;
+  return (s.count * 5) + (s.inFrozen ? 20 : 0) + (s.inAny ? 10 : 0) + (s.inRecent ? 5 : 0);
+}
+
 /* ─── Mini item thumbnail ─────────────────────────────────────────────────── */
-function Thumb({ item, selected, onSelect }) {
+function Thumb({ item, selected, stats, onSelect }) {
   const [failed, setFailed] = useState(false);
-  const name    = item.n || item.itemName || "";
-  const color   = item.col || item.color || "Black";
-  const brand   = item.b || item.brand || "";
-  const img     = item.img || item.imageUrl || "";
-  const cat     = item.c || item.category || "";
+  const name     = item.n || item.itemName || "";
+  const color    = item.col || item.color || "Black";
+  const brand    = item.b || item.brand || "";
+  const img      = item.img || item.imageUrl || "";
+  const cat      = item.c || item.category || "";
   const [bg, ac, fg] = swatch(color);
-  const emoji = CAT_EMOJI[cat] || "👕";
-  const showImg = img && !failed;
+  const emoji    = CAT_EMOJI[cat] || "👕";
+  const showImg  = img && !failed;
+
+  const inFrozen   = stats?.inFrozen || false;
+  const usageCount = stats?.count    || 0;
 
   return (
     <div
@@ -44,7 +96,7 @@ function Thumb({ item, selected, onSelect }) {
         cursor: "pointer",
         borderRadius: 14,
         overflow: "hidden",
-        border: `2px solid ${selected ? T.text : T.borderLight}`,
+        border: `2px solid ${selected ? T.text : inFrozen ? "#93C5FD" : T.borderLight}`,
         background: T.alt,
         transition: "border-color 0.15s, transform 0.1s",
         transform: selected ? "scale(1.03)" : "scale(1)",
@@ -124,6 +176,26 @@ function Thumb({ item, selected, onSelect }) {
             ✓
           </div>
         )}
+
+        {/* Frozen badge — hidden when selected (checkmark takes priority) */}
+        {inFrozen && !selected && (
+          <div
+            style={{
+              position: "absolute",
+              top: 6,
+              right: 6,
+              background: "#1E3A5F",
+              color: "#93C5FD",
+              borderRadius: 6,
+              fontSize: 9,
+              fontWeight: 700,
+              padding: "2px 5px",
+              lineHeight: 1.4,
+            }}
+          >
+            🔒
+          </div>
+        )}
       </div>
 
       {/* Label */}
@@ -147,6 +219,11 @@ function Thumb({ item, selected, onSelect }) {
             {brand.toUpperCase()}
           </p>
         )}
+        {usageCount >= 2 && (
+          <p style={{ fontSize: 8, color: "#93C5FD", marginTop: 2, fontWeight: 700 }}>
+            ×{usageCount} used
+          </p>
+        )}
       </div>
     </div>
   );
@@ -157,21 +234,34 @@ function Thumb({ item, selected, onSelect }) {
 //   wardrobe    – full items array (from useWardrobe)
 //   layer       – "base"|"mid"|"outer"|"bottom"|"shoes" — pre-filters the list
 //   currentId   – currently selected item ID (shown as selected)
+//   outfitIds   – full outfit state for usage-based ranking
+//   frozenDays  – frozen state for badge + score boost
 //   onSelect(item) – called when user confirms a selection
 //   onClose     – called to dismiss without selecting
-export default function ItemPicker({ wardrobe, layer, currentId, onSelect, onClose }) {
-  const [q,        setQ]        = useState("");
-  const [pending,  setPending]  = useState(currentId || null);
+export default function ItemPicker({
+  wardrobe,
+  layer,
+  currentId,
+  outfitIds  = {},
+  frozenDays = {},
+  onSelect,
+  onClose,
+}) {
+  const [q,       setQ]       = useState("");
+  const [pending, setPending] = useState(currentId || null);
 
   const filterFn   = LAYER_FILTER[layer];
   const layerLabel = LAYER_LABELS[layer] || layer;
 
+  /* Precompute usage stats — recomputes only when outfit/freeze state changes */
+  const usageStats = useMemo(
+    () => computeUsageStats(outfitIds, frozenDays),
+    [outfitIds, frozenDays]
+  );
+
   /* Filter by layer field (l), then by search query */
   const filtered = useMemo(() => {
-    const pool = filterFn
-      ? wardrobe.filter(filterFn)
-      : wardrobe;
-
+    const pool = filterFn ? wardrobe.filter(filterFn) : wardrobe;
     if (!q.trim()) return pool;
     const lq = q.toLowerCase();
     return pool.filter(
@@ -181,7 +271,39 @@ export default function ItemPicker({ wardrobe, layer, currentId, onSelect, onClo
         (i.b || i.brand || "").toLowerCase().includes(lq) ||
         (i.productCode || "").toLowerCase().includes(lq)
     );
-  }, [wardrobe, layer, q]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wardrobe, layer, q]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* Sort by score descending, then alphabetical — applied to search results too */
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const diff = itemScore(usageStats[b.id]) - itemScore(usageStats[a.id]);
+      if (diff !== 0) return diff;
+      return (a.n || "").localeCompare(b.n || "");
+    });
+  }, [filtered, usageStats]);
+
+  /* Partition into sections — no item appears in more than one section:
+       1. 🔥 Frequently Used  — usageCount ≥ 2
+       2. 📦 In Packing       — inFrozen but not already in Frequently Used
+       3. All Items           — everything else
+     Section headers only rendered when at least one special section exists. */
+  const sections = useMemo(() => {
+    const frequentItems = sorted.filter((i) => (usageStats[i.id]?.count || 0) >= 2);
+    const frequentIds   = new Set(frequentItems.map((i) => i.id));
+
+    const packedItems   = sorted.filter((i) => usageStats[i.id]?.inFrozen && !frequentIds.has(i.id));
+    const packedIds     = new Set(packedItems.map((i) => i.id));
+
+    const restItems     = sorted.filter((i) => !frequentIds.has(i.id) && !packedIds.has(i.id));
+
+    const result = [];
+    if (frequentItems.length > 0) result.push({ label: "🔥 Frequently Used", items: frequentItems });
+    if (packedItems.length  > 0)  result.push({ label: "📦 In Packing",       items: packedItems  });
+    result.push({ label: "All Items", items: restItems });
+    return result;
+  }, [sorted, usageStats]);
+
+  const hasSpecialSections = sections.length > 1;
 
   function confirm() {
     if (!pending) return;
@@ -297,22 +419,45 @@ export default function ItemPicker({ wardrobe, layer, currentId, onSelect, onClo
               No items found
             </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
-                gap: 10,
-              }}
-            >
-              {filtered.map((item) => (
-                <Thumb
-                  key={item.id}
-                  item={item}
-                  selected={pending === item.id}
-                  onSelect={() => setPending(item.id)}
-                />
-              ))}
-            </div>
+            sections.map((section) => {
+              if (section.items.length === 0) return null;
+              return (
+                <div key={section.label} style={{ marginBottom: 8 }}>
+                  {hasSpecialSections && (
+                    <p
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        color: T.mid,
+                        letterSpacing: 1,
+                        textTransform: "uppercase",
+                        paddingTop: 8,
+                        paddingBottom: 6,
+                      }}
+                    >
+                      {section.label}
+                    </p>
+                  )}
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                      gap: 10,
+                    }}
+                  >
+                    {section.items.map((item) => (
+                      <Thumb
+                        key={item.id}
+                        item={item}
+                        selected={pending === item.id}
+                        stats={usageStats[item.id]}
+                        onSelect={() => setPending(item.id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })
           )}
         </div>
 

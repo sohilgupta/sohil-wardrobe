@@ -733,6 +733,8 @@ export default function OutfitsTab({
           wardrobe={wardrobe}
           layer={pickerLayer.layer}
           currentId={pickerCurrentId}
+          outfitIds={outfitIds}
+          frozenDays={frozenDays}
           onSelect={handlePickerSelect}
           onClose={() => setPickerLayer(null)}
         />
