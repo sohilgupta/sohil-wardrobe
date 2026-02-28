@@ -79,7 +79,7 @@ function resolveImg(raw) {
   return "";
 }
 
-/* ─── Derive layer / occasion / weather from tab name ─────────────────────── */
+/* ─── Derive layer from tab name ─────────────────────────────────────────── */
 export function layerFromTab(tab) {
   const t = tab.toLowerCase();
   if (t.includes("jacket")) return "Outer";
@@ -88,6 +88,17 @@ export function layerFromTab(tab) {
   if (t.includes("bottom")) return "Bottom";
   // Shirts, Gym Tshirts, Thermals → Base
   return "Base";
+}
+
+/* ─── Footwear keywords — override layer if tab assignment is wrong ─────── */
+const FOOTWEAR_KEYWORDS = [
+  "shoe", "shoes", "sneaker", "boot", "loafer", "slipper",
+  "sandal", "slide", "slides", "flip flop", "trainer", "mule",
+];
+
+function isFootwearByName(name) {
+  const lower = name.toLowerCase();
+  return FOOTWEAR_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 export function occFromTab(tab) {
@@ -116,6 +127,7 @@ function normalizeTab(tabName, gvizData) {
 
   const colIdx = {
     name:        findColByLabel(cols, "item name", "name"),
+    category:    findColByLabel(cols, "category"),
     color:       findColByLabel(cols, "color", "colour"),
     brand:       findColByLabel(cols, "brand"),
     productCode: findColByLabel(cols, "product code", "sku", "code"),
@@ -151,11 +163,17 @@ function normalizeTab(tabName, gvizData) {
         .slice(0, 8)
         .replace(/\W/g, "")}`;
 
+      // If the tab-based layer is wrong (e.g. slides in Gym Tshirts),
+      // override with Footwear when the item name contains footwear keywords.
+      const effectiveLayer = (layer !== "Footwear" && isFootwearByName(name))
+        ? "Footwear"
+        : layer;
+
       return {
         id,
         // ─ display fields (short-field schema used by ItemVisual / WardrobeTab)
         n:   name,
-        c:   tabName,       // category = tab name
+        c:   (colIdx.category !== -1 ? cellVal(row, colIdx.category) : "") || tabName,
         col: color,
         b:   brand,
         img: resolveImg(imgRaw),
@@ -165,7 +183,7 @@ function normalizeTab(tabName, gvizData) {
         size:     cellVal(row, colIdx.size),
         price:    cellVal(row, colIdx.price),
         // ─ derived outfit-engine fields
-        l:   layer,         // "Outer" | "Mid" | "Base" | "Bottom" | "Footwear"
+        l:   effectiveLayer, // "Outer" | "Mid" | "Base" | "Bottom" | "Footwear"
         occ,                // "Casual" | "Gym"
         w:   weather,       // "Cold" | "Mild" | "Warm"
         t:   "Yes",         // all wardrobe items treated as travel-ready

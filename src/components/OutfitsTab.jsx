@@ -16,8 +16,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { T } from "../theme";
 import TRIP from "../data/trip";
-import { generateOutfit } from "../utils/styleLogic";
-import { generateTripOutfits } from "../utils/tripGenerator";
+// generateOutfit (local engine) removed — regen now uses Gemini via generateSingleOutfit
+import { generateTripOutfits, generateSingleOutfit } from "../utils/tripGenerator";
 import OutfitCard from "./OutfitCard";
 import ItemPicker from "./ItemPicker";
 import Chip from "./Chip";
@@ -50,15 +50,6 @@ function resolveOutfit(slotIds, wardrobe) {
     shoes:  resolve(slotIds.shoes),
   };
 }
-
-/* ─── Extract IDs from full-item outfit object ───────────────────────────── */
-const toIds = (outfit) => ({
-  base:   outfit.base?.id   || null,
-  mid:    outfit.mid?.id    || null,
-  outer:  outfit.outer?.id  || null,
-  bottom: outfit.bottom?.id || null,
-  shoes:  outfit.shoes?.id  || null,
-});
 
 /* ─── Chip colour helpers ────────────────────────────────────────────────── */
 const wColors   = (w) => T.weather[w] || ["#27272A", "#A1A1AA"];
@@ -337,35 +328,32 @@ export default function OutfitsTab({
     }
   }
 
-  /* ── Local regen: one slot for the selected day ── */
-  const regenSlot = useCallback((slot) => {
+  /* ── Regen one slot via Gemini ── */
+  const regenSlot = useCallback(async (slot) => {
     if (!selectedDay || isCurrentFrozen || wardrobe.length === 0) return;
 
     setSlotLoading({ dayId: selectedDay.id, slot });
 
-    // IDs used on other days (to encourage variety)
-    const otherUsed = new Set();
-    Object.entries(outfitIds).forEach(([dId, dayData]) => {
-      if (dId !== selectedDay.id && dayData) {
-        ["daytime", "evening"].forEach((s) => {
-          const ids = dayData[s];
-          if (ids) Object.values(ids).forEach((id) => id && id !== "REMOVED" && otherUsed.add(id));
-        });
-      }
-    });
+    // Preserve REMOVED sentinels from existing slot
+    const prevSlotIds  = outfitIds[selectedDay.id]?.[slot] || {};
+    const midRemoved   = prevSlotIds.mid   === "REMOVED";
+    const outerRemoved = prevSlotIds.outer === "REMOVED";
 
-    const prevSlotIds    = outfitIds[selectedDay.id]?.[slot] || {};
-    const midRemoved     = prevSlotIds.mid   === "REMOVED";
-    const outerRemoved   = prevSlotIds.outer === "REMOVED";
-
-    // For evening, override occasion from the night field
+    // For evening, use the evening occasion derived from the night field
     const effectiveDay = slot === "evening"
       ? { ...selectedDay, occ: eveningOcc(selectedDay.night) }
       : selectedDay;
 
-    setTimeout(() => {
-      const outfit = generateOutfit(wardrobe, effectiveDay, otherUsed);
-      const ids    = toIds(outfit);
+    try {
+      const ids = await generateSingleOutfit({
+        wardrobe,
+        occ:     effectiveDay.occ,
+        weather: effectiveDay.w,
+        city:    effectiveDay.city,
+        act:     slot === "daytime" ? effectiveDay.day : effectiveDay.night,
+      });
+
+      // Re-apply REMOVED sentinels so the user's explicit layer removals are kept
       if (midRemoved)   ids.mid   = "REMOVED";
       if (outerRemoved) ids.outer = "REMOVED";
 
@@ -376,8 +364,12 @@ export default function OutfitsTab({
           [selectedDay.id]: { ...dayData, [slot]: ids },
         };
       });
+    } catch (err) {
+      setAiError(err.message || "Regen failed. Try again.");
+      setTimeout(() => setAiError(null), 4000);
+    } finally {
       setSlotLoading(null);
-    }, 0);
+    }
   }, [selectedDay, isCurrentFrozen, wardrobe, outfitIds, setOutfitIds]);
 
   /* ── Open ItemPicker for manual slot+layer selection ── */
