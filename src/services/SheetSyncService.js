@@ -101,6 +101,16 @@ function isFootwearByName(name) {
   return FOOTWEAR_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
+/* ─── Bottom keywords — override layer for thermal tights/leggings ────────
+   Thermal tights and leggings live in the "Thermals" tab (→ l:"Base" by
+   default) but are worn on the legs, so they should be l:"Bottom".       */
+const BOTTOM_OVERRIDE_KEYWORDS = ["tight", "legging"];
+
+function isBottomByName(name) {
+  const lower = name.toLowerCase();
+  return BOTTOM_OVERRIDE_KEYWORDS.some((kw) => lower.includes(kw));
+}
+
 export function occFromTab(tab) {
   const t = tab.toLowerCase();
   if (t.includes("gym")) return "Gym";
@@ -163,11 +173,14 @@ function normalizeTab(tabName, gvizData) {
         .slice(0, 8)
         .replace(/\W/g, "")}`;
 
-      // If the tab-based layer is wrong (e.g. slides in Gym Tshirts),
-      // override with Footwear when the item name contains footwear keywords.
-      const effectiveLayer = (layer !== "Footwear" && isFootwearByName(name))
-        ? "Footwear"
-        : layer;
+      // Override layer based on item name when tab assignment is wrong:
+      //  - Footwear keywords (slides, sneakers…) → always "Footwear"
+      //  - Bottom keywords (tights, leggings…)   → always "Bottom"
+      //    (e.g. Heattech Tights sit in the Thermals tab → Base by default)
+      const effectiveLayer =
+        layer !== "Footwear" && isFootwearByName(name) ? "Footwear" :
+        layer !== "Bottom"   && isBottomByName(name)   ? "Bottom"   :
+        layer;
 
       return {
         id,

@@ -1,15 +1,20 @@
 import { useState, useMemo } from "react";
 import { T, swatch, CAT_EMOJI } from "../theme";
 
-/* ─── Which wardrobe categories belong to each outfit layer ─────────────────
-   Used to auto-filter the picker when editing a specific slot.
+/* ─── Layer filter functions ──────────────────────────────────────────────────
+   Filter wardrobe items for each outfit layer slot.
+   Filtering uses the item's `l` field (derived + corrected in SheetSyncService)
+   rather than tab names — so footwear/bottom overrides flow through automatically.
+
+   Base also includes Sweaters tab items (pullovers/crewnecks worn as the
+   primary visible top), since a sweatshirt or crewneck is a valid base layer.
    ─────────────────────────────────────────────────────────────────────────── */
-export const LAYER_TABS = {
-  base:   ["Shirts", "Gym Tshirts", "Thermals"],
-  mid:    ["Sweaters"],
-  outer:  ["Jackets"],
-  bottom: ["Bottoms"],
-  shoes:  ["Shoes"],
+export const LAYER_FILTER = {
+  base:   (i) => i.l === "Base" || i._tab === "Sweaters",
+  mid:    (i) => i.l === "Mid",
+  outer:  (i) => i.l === "Outer",
+  bottom: (i) => i.l === "Bottom",
+  shoes:  (i) => i.l === "Footwear",
 };
 
 const LAYER_LABELS = {
@@ -158,19 +163,13 @@ export default function ItemPicker({ wardrobe, layer, currentId, onSelect, onClo
   const [q,        setQ]        = useState("");
   const [pending,  setPending]  = useState(currentId || null);
 
-  const allowedTabs = LAYER_TABS[layer] || [];
-  const layerLabel  = LAYER_LABELS[layer] || layer;
+  const filterFn   = LAYER_FILTER[layer];
+  const layerLabel = LAYER_LABELS[layer] || layer;
 
-  /* Filter: tab → layer, then search */
+  /* Filter by layer field (l), then by search query */
   const filtered = useMemo(() => {
-    const pool = allowedTabs.length
-      // Match by _tab (source sheet name) first, then fall back to c/category.
-      // This ensures items whose `c` is a subcategory (e.g. "Linen Pants" from
-      // the Bottoms sheet) still appear when picking a bottom-layer slot.
-      ? wardrobe.filter((i) =>
-          allowedTabs.includes(i._tab) ||
-          allowedTabs.includes(i.c || i.category)
-        )
+    const pool = filterFn
+      ? wardrobe.filter(filterFn)
       : wardrobe;
 
     if (!q.trim()) return pool;
@@ -233,7 +232,6 @@ export default function ItemPicker({ wardrobe, layer, currentId, onSelect, onClo
               </p>
               <p style={{ fontSize: 11, color: T.mid, marginTop: 2 }}>
                 {filtered.length} item{filtered.length !== 1 ? "s" : ""}
-                {allowedTabs.length ? ` · ${allowedTabs.join(", ")}` : ""}
               </p>
             </div>
             <button
