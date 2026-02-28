@@ -77,6 +77,8 @@ export default function App() {
 /* ─── AUTHENTICATED APP — only mounts after auth check passes ─────────────── */
 function AuthenticatedApp({ onLogout }) {
   const [tab, setTab] = useState("wardrobe");
+  // focusDayId: when set, OutfitsTab auto-selects that day on mount/change
+  const [focusDayId, setFocusDayId] = useState(null);
 
   const {
     items:      wardrobe,
@@ -90,9 +92,15 @@ function AuthenticatedApp({ onLogout }) {
   } = useWardrobe();
 
   // Outfit-per-day state — shared between Daily and Packing tabs
-  const { outfitIds, setOutfitIds } = useOutfits();
+  const { outfitIds, setOutfitIds, frozenDays, toggleFreeze } = useOutfits();
 
   const travel = wardrobe.filter((i) => i.t === "Yes").length;
+
+  // Navigate to Daily tab and focus a specific day
+  function navigateToDay(dayId) {
+    setFocusDayId(dayId);
+    setTab("daily");
+  }
 
   return (
     <div
@@ -247,11 +255,11 @@ function AuthenticatedApp({ onLogout }) {
             onAdd={addItem}
           />
         )}
-        {tab === "trip"    && <TripTab    wardrobe={wardrobe} />}
-        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} />}
-        {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} />}
+        {tab === "trip"    && <TripTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} onNavigateToDay={navigateToDay} />}
+        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} toggleFreeze={toggleFreeze} focusDayId={focusDayId} onFocusConsumed={() => setFocusDayId(null)} />}
+        {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} />}
         {tab === "add"     && <AddTab     onAdd={addItem} />}
-        {tab === "packing" && <PackTab    wardrobe={wardrobe} outfitIds={outfitIds} />}
+        {tab === "packing" && <PackTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} />}
       </div>
     </div>
   );
