@@ -18,6 +18,9 @@ const INPUT = {
 };
 
 /* ─── filter select helpers ──────────────────────────────────────────────── */
+// NOTE: use `backgroundColor` (not `background` shorthand) when combining with
+// `backgroundImage` — the shorthand resets backgroundRepeat/backgroundPosition,
+// causing the arrow SVG to tile across the whole element.
 const selStyle = {
   padding: "7px 28px 7px 12px",
   borderRadius: 20,
@@ -30,11 +33,11 @@ const selStyle = {
   backgroundPosition: "right 10px center",
   outline: "none",
 };
-const selBg     = (a) => (a ? T.text    : "#2C2C36");
-const selColor  = (a) => (a ? T.bg     : T.text);
-const selBorder = (a) => `1.5px solid ${a ? T.text : "#4A4A58"}`;
+const selBg     = (a) => (a ? "#E8E6E1" : "#26262B");   // neutral off-white / dark
+const selColor  = (a) => (a ? "#0F0F12" : "#C4C1BB");   // near-black / warm gray
+const selBorder = (a) => `1.5px solid ${a ? "#E8E6E1" : "#3C3C44"}`;
 const selArrow  = (a) =>
-  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='${a ? "%230F0F12" : "%23B0ADA7"}'/%3E%3C/svg%3E")`;
+  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='${a ? "%230F0F12" : "%23C4C1BB"}'/%3E%3C/svg%3E")`;
 
 /* ─── sync status badge ──────────────────────────────────────────────────── */
 function SyncBadge({ status, lastSync, onSync }) {
@@ -196,25 +199,25 @@ export default function WardrobeTab({
       {/* ── Filters ── */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
         <select value={cat} onChange={(e) => setCat(e.target.value)}
-          style={{ ...selStyle, background: selBg(cat), color: selColor(cat), border: selBorder(cat), backgroundImage: selArrow(cat) }}>
+          style={{ ...selStyle, backgroundColor: selBg(cat), color: selColor(cat), border: selBorder(cat), backgroundImage: selArrow(cat) }}>
           <option value="">Category</option>
           {cats.map((o) => <option key={o}>{o}</option>)}
         </select>
 
         <select value={col} onChange={(e) => setCol(e.target.value)}
-          style={{ ...selStyle, background: selBg(col), color: selColor(col), border: selBorder(col), backgroundImage: selArrow(col) }}>
+          style={{ ...selStyle, backgroundColor: selBg(col), color: selColor(col), border: selBorder(col), backgroundImage: selArrow(col) }}>
           <option value="">Color</option>
           {colors.map((o) => <option key={o}>{o}</option>)}
         </select>
 
         <select value={occ} onChange={(e) => setOcc(e.target.value)}
-          style={{ ...selStyle, background: selBg(occ), color: selColor(occ), border: selBorder(occ), backgroundImage: selArrow(occ) }}>
+          style={{ ...selStyle, backgroundColor: selBg(occ), color: selColor(occ), border: selBorder(occ), backgroundImage: selArrow(occ) }}>
           <option value="">Occasion</option>
           {["Casual", "Dinner", "Flight", "Hiking", "Gym", "Formal"].map((o) => <option key={o}>{o}</option>)}
         </select>
 
         <select value={wth} onChange={(e) => setWth(e.target.value)}
-          style={{ ...selStyle, background: selBg(wth), color: selColor(wth), border: selBorder(wth), backgroundImage: selArrow(wth) }}>
+          style={{ ...selStyle, backgroundColor: selBg(wth), color: selColor(wth), border: selBorder(wth), backgroundImage: selArrow(wth) }}>
           <option value="">Weather</option>
           {["Cold", "Mild", "Warm"].map((o) => <option key={o}>{o}</option>)}
         </select>
