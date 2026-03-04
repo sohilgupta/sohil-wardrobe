@@ -30,11 +30,11 @@ const selStyle = {
   backgroundPosition: "right 10px center",
   outline: "none",
 };
-const selBg     = (a) => (a ? T.text    : T.surface);
-const selColor  = (a) => (a ? "#fff"    : T.mid);
-const selBorder = (a) => `1.5px solid ${a ? T.text : T.border}`;
+const selBg     = (a) => (a ? T.text    : "#2C2C36");
+const selColor  = (a) => (a ? T.bg     : T.text);
+const selBorder = (a) => `1.5px solid ${a ? T.text : "#4A4A58"}`;
 const selArrow  = (a) =>
-  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='${a ? "%23fff" : "%23666"}'/%3E%3C/svg%3E")`;
+  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='${a ? "%230F0F12" : "%23B0ADA7"}'/%3E%3C/svg%3E")`;
 
 /* ─── sync status badge ──────────────────────────────────────────────────── */
 function SyncBadge({ status, lastSync, onSync }) {
