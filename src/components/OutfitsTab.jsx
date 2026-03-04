@@ -6,11 +6,11 @@
 
    Outfit per day schema:
    {
-     daytime: { base, mid?, outer?, bottom, shoes } | null,
-     evening: { base, mid?, outer?, bottom, shoes } | null,
+     daytime: { base, mid?, outer?, bottom, thermalBottom?, shoes } | null,
+     evening: { base, mid?, outer?, bottom, thermalBottom?, shoes } | null,
    }
 
-   "REMOVED" sentinel: user explicitly removed optional mid/outer layer.
+   "REMOVED" sentinel: user explicitly removed optional mid/outer/thermalBottom layer.
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useEffect, useCallback } from "react";
@@ -43,11 +43,12 @@ function resolveOutfit(slotIds, wardrobe) {
     return { _missing: true, id, n: "Item removed", c: "", col: "Grey", b: "", img: "" };
   };
   return {
-    base:   resolve(slotIds.base),
-    mid:    resolve(slotIds.mid),
-    outer:  resolve(slotIds.outer),
-    bottom: resolve(slotIds.bottom),
-    shoes:  resolve(slotIds.shoes),
+    base:          resolve(slotIds.base),
+    mid:           resolve(slotIds.mid),
+    outer:         resolve(slotIds.outer),
+    bottom:        resolve(slotIds.bottom),
+    thermalBottom: resolve(slotIds.thermalBottom),
+    shoes:         resolve(slotIds.shoes),
   };
 }
 
@@ -163,8 +164,9 @@ function SlotSection({
   isFrozen, isLoading,
   onPick, onRegenerate, onRemoveLayer, onAddLayer,
 }) {
-  const midActive   = !!(slotIds?.mid   && slotIds.mid   !== "REMOVED");
-  const outerActive = !!(slotIds?.outer && slotIds.outer !== "REMOVED");
+  const midActive           = !!(slotIds?.mid           && slotIds.mid           !== "REMOVED");
+  const outerActive         = !!(slotIds?.outer         && slotIds.outer         !== "REMOVED");
+  const thermalBottomActive = !!(slotIds?.thermalBottom && slotIds.thermalBottom !== "REMOVED");
   const hasOutfit   = slotIds && Object.values(slotIds).some((v) => v && v !== "REMOVED");
 
   return (
@@ -247,8 +249,9 @@ function SlotSection({
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light, marginRight: 2 }}>
             LAYERS
           </span>
-          <LayerBtn active={midActive}   label="Mid"   onAdd={() => onAddLayer("mid")}   onRemove={() => onRemoveLayer("mid")} />
-          <LayerBtn active={outerActive} label="Outer" onAdd={() => onAddLayer("outer")} onRemove={() => onRemoveLayer("outer")} />
+          <LayerBtn active={midActive}           label="Mid"            onAdd={() => onAddLayer("mid")}           onRemove={() => onRemoveLayer("mid")} />
+          <LayerBtn active={outerActive}         label="Outer"          onAdd={() => onAddLayer("outer")}         onRemove={() => onRemoveLayer("outer")} />
+          <LayerBtn active={thermalBottomActive} label="Therm. Bottom"  onAdd={() => onAddLayer("thermalBottom")} onRemove={() => onRemoveLayer("thermalBottom")} />
         </div>
       )}
     </div>
@@ -337,9 +340,10 @@ export default function OutfitsTab({
     setSlotLoading({ dayId: selectedDay.id, slot });
 
     // Preserve REMOVED sentinels from existing slot
-    const prevSlotIds  = outfitIds[selectedDay.id]?.[slot] || {};
-    const midRemoved   = prevSlotIds.mid   === "REMOVED";
-    const outerRemoved = prevSlotIds.outer === "REMOVED";
+    const prevSlotIds          = outfitIds[selectedDay.id]?.[slot] || {};
+    const midRemoved           = prevSlotIds.mid           === "REMOVED";
+    const outerRemoved         = prevSlotIds.outer         === "REMOVED";
+    const thermalBottomRemoved = prevSlotIds.thermalBottom === "REMOVED";
 
     // For evening, use the evening occasion derived from the night field
     const effectiveDay = slot === "evening"
@@ -356,8 +360,9 @@ export default function OutfitsTab({
       });
 
       // Re-apply REMOVED sentinels so the user's explicit layer removals are kept
-      if (midRemoved)   ids.mid   = "REMOVED";
-      if (outerRemoved) ids.outer = "REMOVED";
+      if (midRemoved)           ids.mid           = "REMOVED";
+      if (outerRemoved)         ids.outer         = "REMOVED";
+      if (thermalBottomRemoved) ids.thermalBottom = "REMOVED";
 
       setOutfitIds((prev) => {
         const dayData = prev[selectedDay.id] || { daytime: null, evening: null };

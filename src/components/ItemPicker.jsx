@@ -11,19 +11,21 @@ import TRIP from "../data/trip";
    primary visible top, since a sweatshirt or crewneck is a valid base layer.
    ─────────────────────────────────────────────────────────────────────────── */
 export const LAYER_FILTER = {
-  base:   (i) => i.l === "Base" || i._tab === "Sweaters",
-  mid:    (i) => i.l === "Mid" || i._tab === "Shirts",
-  outer:  (i) => i.l === "Outer",
-  bottom: (i) => i.l === "Bottom",
-  shoes:  (i) => i.l === "Footwear",
+  base:          (i) => i.l === "Base" || i._tab === "Sweaters",
+  mid:           (i) => i.l === "Mid" || i._tab === "Shirts",
+  outer:         (i) => i.l === "Outer",
+  bottom:        (i) => i.l === "Bottom" && i._tab !== "Thermals",
+  thermalBottom: (i) => i._tab === "Thermals" && i.l === "Bottom",
+  shoes:         (i) => i.l === "Footwear",
 };
 
 const LAYER_LABELS = {
-  base:   "Base / Top",
-  mid:    "Mid Layer",
-  outer:  "Outer / Jacket",
-  bottom: "Bottom",
-  shoes:  "Shoes",
+  base:          "Base / Top",
+  mid:           "Mid Layer",
+  outer:         "Outer / Jacket",
+  bottom:        "Bottom",
+  thermalBottom: "Thermal Bottom",
+  shoes:         "Shoes",
 };
 
 /* ─── Usage stats precomputation ─────────────────────────────────────────────

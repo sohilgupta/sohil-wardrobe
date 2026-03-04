@@ -3,11 +3,12 @@ import { T, swatch, CAT_EMOJI } from "../theme";
 
 /* ─── LAYER META ─────────────────────────────────────────────────────────── */
 const LAYER_META = {
-  base:   { label: "BASE",   order: 1 },
-  mid:    { label: "MID",    order: 2 },
-  outer:  { label: "OUTER",  order: 3 },
-  bottom: { label: "BOTTOM", order: 4 },
-  shoes:  { label: "SHOES",  order: 5 },
+  base:          { label: "BASE",    order: 1 },
+  mid:           { label: "MID",     order: 2 },
+  outer:         { label: "OUTER",   order: 3 },
+  thermalBottom: { label: "THERMAL", order: 4 },
+  bottom:        { label: "BOTTOM",  order: 5 },
+  shoes:         { label: "SHOES",   order: 6 },
 };
 
 /* ─── PREMIUM ITEM THUMB ─────────────────────────────────────────────────── */
@@ -259,7 +260,7 @@ function Slot({ layer, item, onSwap, width, height, alwaysSwap = false }) {
 
 /* ─── EXPAND MODAL ───────────────────────────────────────────────────────── */
 function OutfitExpandModal({ outfit, onSwap, onRegenerate, onClose }) {
-  const { base, mid, outer, bottom, shoes } = outfit;
+  const { base, mid, outer, thermalBottom, bottom, shoes } = outfit;
 
   // Close on Escape
   useEffect(() => {
@@ -360,11 +361,12 @@ function OutfitExpandModal({ outfit, onSwap, onRegenerate, onClose }) {
           </div>
         )}
 
-        {/* Lower row: BOTTOM + SHOES */}
-        {(bottom || shoes) && (
-          <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "16px 20px 0" }}>
-            {bottom && <Slot layer="bottom" item={bottom} onSwap={() => handleSwap("bottom")} width={140} height={140} alwaysSwap />}
-            {shoes  && <Slot layer="shoes"  item={shoes}  onSwap={() => handleSwap("shoes")}  width={140} height={140} alwaysSwap />}
+        {/* Lower row: THERMAL BOTTOM + BOTTOM + SHOES */}
+        {(thermalBottom || bottom || shoes) && (
+          <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "16px 20px 0", flexWrap: "wrap" }}>
+            {thermalBottom && <Slot layer="thermalBottom" item={thermalBottom} onSwap={() => handleSwap("thermalBottom")} width={120} height={120} alwaysSwap />}
+            {bottom        && <Slot layer="bottom"        item={bottom}        onSwap={() => handleSwap("bottom")}        width={140} height={140} alwaysSwap />}
+            {shoes         && <Slot layer="shoes"         item={shoes}         onSwap={() => handleSwap("shoes")}         width={140} height={140} alwaysSwap />}
           </div>
         )}
 
@@ -414,7 +416,7 @@ function OutfitExpandModal({ outfit, onSwap, onRegenerate, onClose }) {
 
 /* ─── OUTFIT CARD (main export) ──────────────────────────────────────────── */
 // Props (unchanged public API):
-//   outfit:       { base, mid, outer, bottom, shoes } — full item objects or null
+//   outfit:       { base, mid, outer, thermalBottom, bottom, shoes } — full item objects or null
 //   onSwap(layer): callback to swap an item in that layer
 //   onRegenerate:  callback to regenerate the full outfit
 //   loading:       boolean
@@ -469,9 +471,9 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
     );
   }
 
-  const { base, mid, outer, bottom, shoes } = outfit;
+  const { base, mid, outer, thermalBottom, bottom, shoes } = outfit;
   const hasCompanions = mid || outer;
-  const hasLower      = bottom || shoes;
+  const hasLower      = thermalBottom || bottom || shoes;
 
   return (
     <>
@@ -533,9 +535,18 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
           <div style={{ height: 1, background: T.borderLight, margin: "0 0 14px" }} />
         )}
 
-        {/* ── Lower row: BOTTOM + SHOES ── */}
+        {/* ── Lower row: THERMAL BOTTOM + BOTTOM + SHOES ── */}
         {hasLower && (
-          <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 16 }}>
+          <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 16, flexWrap: "wrap" }}>
+            {thermalBottom && (
+              <Slot
+                layer="thermalBottom"
+                item={thermalBottom}
+                onSwap={onSwap ? () => onSwap("thermalBottom") : null}
+                width={100}
+                height={100}
+              />
+            )}
             {bottom && (
               <Slot
                 layer="bottom"
