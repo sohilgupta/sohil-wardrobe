@@ -28,6 +28,7 @@ export const T = {
     Hiking: ["#14532D", "#4ADE80"],
     Gym: ["#431407", "#FB923C"],
     Formal: ["#2E1065", "#A78BFA"],
+    Show:   ["#3B1A5A", "#C084FC"],
   },
 };
 

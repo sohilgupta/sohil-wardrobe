@@ -11,7 +11,7 @@
    ─────────────────────────────────────────────────────────────────────────── */
 const TRIP = [
   {id:"d01",date:"Wed Apr 1", city:"Delhi → Sydney",        day:"Overnight Flight",              night:"Flight",                         occ:"Flight",  w:"Cold", e:"✈️"},
-  {id:"d02",date:"Thu Apr 2", city:"Sydney",                 day:"Arrival · Taronga Zoo · Ferry", night:"Casual Dinner",                   occ:"Casual",  w:"Mild", e:"🦁"},
+  {id:"d02",date:"Thu Apr 2", city:"Sydney",                 day:"Arrival · Taronga Zoo · Ferry", night:"Phantom of the Opera — Evening Show (7:30 PM)", occ:"Casual",  w:"Mild", e:"🦁"},
   {id:"d03",date:"Fri Apr 3", city:"Sydney",                 day:"Bondi Beach",                   night:"🎂 Birthday Dinner",              occ:"Dinner",  w:"Warm", e:"🏖️"},
   {id:"d04",date:"Sat Apr 4", city:"Sydney",                 day:"Opera House · Harbour Bridge",  night:"Casual / Drinks",                 occ:"Casual",  w:"Warm", e:"🎭"},
   {id:"d05",date:"Sun Apr 5", city:"Sydney → Gold Coast",   day:"Flight · Arrival",              night:"Casual",                          occ:"Casual",  w:"Warm", e:"🌊"},

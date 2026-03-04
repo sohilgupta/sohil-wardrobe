@@ -59,6 +59,8 @@ const occColors = (o) => T.occ[o]     || ["#27272A", "#A1A1AA"];
 function eveningOcc(night) {
   if (!night) return "Casual";
   const n = night.toLowerCase();
+  if (n.includes("show") || n.includes("theatre") || n.includes("theater") || n.includes("opera") || n.includes("phantom"))
+    return "Show";
   if (n.includes("dinner") || n.includes("rooftop") || n.includes("elevated") || n.includes("smart casual"))
     return "Dinner";
   if (n.includes("flight")) return "Flight";
