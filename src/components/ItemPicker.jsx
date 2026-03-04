@@ -12,7 +12,7 @@ import TRIP from "../data/trip";
    ─────────────────────────────────────────────────────────────────────────── */
 export const LAYER_FILTER = {
   base:   (i) => i.l === "Base" || i._tab === "Sweaters",
-  mid:    (i) => i.l === "Mid",
+  mid:    (i) => i.l === "Mid" || i._tab === "Shirts",
   outer:  (i) => i.l === "Outer",
   bottom: (i) => i.l === "Bottom",
   shoes:  (i) => i.l === "Footwear",
