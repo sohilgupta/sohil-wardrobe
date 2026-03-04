@@ -115,14 +115,17 @@ function isBottomByName(name) {
    Maps item names to unified category labels so similar items (e.g. pullover,
    sweater, sweatshirt) always appear under one heading.  The tab name is the
    fallback when no keyword matches.                                          */
+// Rule order matters: first match wins.
+// Jackets → Base Layers → Activewear → Shirts → Knitwear → Bottoms → Shoes
+// This prevents broad keywords like "knit" from stealing t-shirts / shirts / zip-ups.
 const DISPLAY_CATEGORY_RULES = [
-  { label: "Knitwear",    keywords: ["pullover", "sweater", "sweatshirt", "hoodie", "crewneck", "cardigan", "knit", "jumper"] },
-  { label: "Jackets",     keywords: ["jacket", "overshirt", "bomber", "blazer", "parka", "windbreaker", "coat", "gilet"] },
-  { label: "Bottoms",     keywords: ["jeans", "jogger", "trouser", "chino", "pants", "shorts", "cargo"] },
-  { label: "Shirts",      keywords: ["shirt", "t-shirt", "tee", "polo", "henley", "oxford", "flannel"] },
+  { label: "Jackets",     keywords: ["jacket", "overshirt", "cardigan", "zip-up", "bomber", "blazer", "parka", "windbreaker", "coat", "gilet"] },
   { label: "Base Layers", keywords: ["thermal", "heattech", "base layer", "merino", "long sleeve"] },
+  { label: "Activewear",  keywords: ["gym", "active", "athletic", "sport", "performance", "running", "track"] },
+  { label: "Shirts",      keywords: ["shirt", "t-shirt", "tee", "polo", "henley", "oxford", "flannel"] },
+  { label: "Knitwear",    keywords: ["pullover", "sweater", "sweatshirt", "hoodie", "crewneck", "knit", "jumper"] },
+  { label: "Bottoms",     keywords: ["jeans", "jogger", "trouser", "chino", "pants", "shorts", "cargo"] },
   { label: "Shoes",       keywords: ["shoe", "sneaker", "boot", "loafer", "slipper", "derby", "trainer", "mule", "sandal"] },
-  { label: "Activewear",  keywords: ["gym", "active", "athletic", "sport", "performance", "running"] },
 ];
 
 function normalizeDisplayCategory(tabName, itemName) {
