@@ -117,7 +117,7 @@ function isBottomByName(name) {
    fallback when no keyword matches.                                          */
 const DISPLAY_CATEGORY_RULES = [
   { label: "Knitwear",    keywords: ["pullover", "sweater", "sweatshirt", "hoodie", "crewneck", "cardigan", "knit", "jumper"] },
-  { label: "Jackets",     keywords: ["jacket", "bomber", "blazer", "parka", "windbreaker", "coat", "gilet"] },
+  { label: "Jackets",     keywords: ["jacket", "overshirt", "bomber", "blazer", "parka", "windbreaker", "coat", "gilet"] },
   { label: "Bottoms",     keywords: ["jeans", "jogger", "trouser", "chino", "pants", "shorts", "cargo"] },
   { label: "Shirts",      keywords: ["shirt", "t-shirt", "tee", "polo", "henley", "oxford", "flannel"] },
   { label: "Base Layers", keywords: ["thermal", "heattech", "base layer", "merino", "long sleeve"] },
