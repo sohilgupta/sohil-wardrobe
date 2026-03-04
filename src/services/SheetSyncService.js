@@ -111,6 +111,31 @@ function isBottomByName(name) {
   return BOTTOM_OVERRIDE_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
+/* ─── Display category normalisation ────────────────────────────────────────
+   Maps item names to unified category labels so similar items (e.g. pullover,
+   sweater, sweatshirt) always appear under one heading.  The tab name is the
+   fallback when no keyword matches.                                          */
+const DISPLAY_CATEGORY_RULES = [
+  { label: "Knitwear",    keywords: ["pullover", "sweater", "sweatshirt", "hoodie", "crewneck", "cardigan", "knit", "jumper"] },
+  { label: "Jackets",     keywords: ["jacket", "bomber", "blazer", "parka", "windbreaker", "coat", "gilet"] },
+  { label: "Bottoms",     keywords: ["jeans", "jogger", "trouser", "chino", "pants", "shorts", "cargo", "denim"] },
+  { label: "Shirts",      keywords: ["shirt", "t-shirt", "tee", "polo", "henley", "oxford", "flannel"] },
+  { label: "Base Layers", keywords: ["thermal", "heattech", "base layer", "merino", "long sleeve"] },
+  { label: "Shoes",       keywords: ["shoe", "sneaker", "boot", "loafer", "slipper", "derby", "trainer", "mule", "sandal"] },
+  { label: "Activewear",  keywords: ["gym", "active", "athletic", "sport", "performance", "running"] },
+];
+
+function normalizeDisplayCategory(tabName, itemName) {
+  const lower = itemName.toLowerCase();
+  for (const { label, keywords } of DISPLAY_CATEGORY_RULES) {
+    if (keywords.some((kw) => lower.includes(kw))) return label;
+  }
+  // Tab-level fallbacks for items whose names don't match any keyword
+  if (tabName === "Gym Tshirts") return "Activewear";
+  if (tabName === "Thermals")    return "Base Layers";
+  return tabName; // Jackets, Shoes, Bottoms, Shirts already clean
+}
+
 export function occFromTab(tab) {
   const t = tab.toLowerCase();
   if (t.includes("gym")) return "Gym";
@@ -168,10 +193,13 @@ function normalizeTab(tabName, gvizData) {
       const productCode = cellVal(row, colIdx.productCode);
       const imgRaw      = cellVal(row, imgColIdx);
 
-      // Stable ID: tab + index + first chars of name
-      const id = `gs_${tabName.replace(/\s+/g, "_")}_${idx}_${name
-        .slice(0, 8)
-        .replace(/\W/g, "")}`;
+      // Stable ID: tab + full name + brand — NOT row-index-dependent.
+      // Using idx in the ID meant inserting/removing any row above an item in
+      // the sheet would change all items below it, invalidating outfit references.
+      const safeTab   = tabName.replace(/\s+/g, "_");
+      const safeName  = name.replace(/\W+/g, "");
+      const safeBrand = brand.replace(/\W+/g, "").slice(0, 8);
+      const id        = `gs_${safeTab}_${safeName}${safeBrand ? `_${safeBrand}` : ""}`;
 
       // Override layer based on item name when tab assignment is wrong:
       //  - Footwear keywords (slides, sneakers…) → always "Footwear"
@@ -186,7 +214,7 @@ function normalizeTab(tabName, gvizData) {
         id,
         // ─ display fields (short-field schema used by ItemVisual / WardrobeTab)
         n:   name,
-        c:   (colIdx.category !== -1 ? cellVal(row, colIdx.category) : "") || tabName,
+        c:   normalizeDisplayCategory(tabName, name),
         col: color,
         b:   brand,
         img: resolveImg(imgRaw),

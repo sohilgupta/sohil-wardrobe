@@ -45,6 +45,57 @@ function loadOverrides() {
 
 function saveOverrides(o) { trySave(OVERRIDES_KEY, o); }
 
+/* ─── Outfit ID remap: old index-based IDs → new stable IDs ──────────────── */
+// Matches old items to new items by tab name + item name, returns a map of
+// old_id → new_id for any pairs where the ID changed.
+function buildIdRemap(oldItems, newItems) {
+  const newByKey = new Map(newItems.map((i) => [`${i._tab}|${i.n}`, i]));
+  const remap    = {};
+  oldItems.forEach((old) => {
+    const matched = newByKey.get(`${old._tab}|${old.n}`);
+    if (matched && matched.id !== old.id) remap[old.id] = matched.id;
+  });
+  return remap;
+}
+
+// Scans localStorage outfitIds, replaces any IDs found in remap, bumps
+// updatedAt for affected days so the local version beats a stale backend.
+// Returns true if anything changed (so caller can dispatch an event).
+function applyRemapToOutfitStorage(remap) {
+  if (!Object.keys(remap).length) return false;
+  try {
+    const raw = JSON.parse(localStorage.getItem("wdb_outfits_v3"));
+    if (!raw?.outfitIds) return false;
+
+    const now   = new Date().toISOString();
+    const mapId = (id) => (id && id !== "REMOVED" && remap[id]) ? remap[id] : id;
+    const mapSlot = (slot) => slot
+      ? { base: mapId(slot.base), mid: mapId(slot.mid), outer: mapId(slot.outer), bottom: mapId(slot.bottom), shoes: mapId(slot.shoes) }
+      : slot;
+
+    let anyChanged = false;
+    const newOutfitIds = {};
+    const newUpdatedAt = { ...(raw.updatedAt || {}) };
+
+    Object.entries(raw.outfitIds).forEach(([dayId, dayData]) => {
+      if (!dayData) { newOutfitIds[dayId] = dayData; return; }
+      const newDt = mapSlot(dayData.daytime);
+      const newEv = mapSlot(dayData.evening);
+      newOutfitIds[dayId] = { ...dayData, daytime: newDt, evening: newEv };
+      if (JSON.stringify(newDt) !== JSON.stringify(dayData.daytime) ||
+          JSON.stringify(newEv) !== JSON.stringify(dayData.evening)) {
+        newUpdatedAt[dayId] = now; // bump so local beats stale backend
+        anyChanged = true;
+      }
+    });
+
+    if (anyChanged) {
+      localStorage.setItem("wdb_outfits_v3", JSON.stringify({ ...raw, outfitIds: newOutfitIds, updatedAt: newUpdatedAt }));
+    }
+    return anyChanged;
+  } catch { return false; }
+}
+
 /* ─── Merge remote items with local overrides ────────────────────────────── */
 function applyOverrides(remoteItems, overrides) {
   const { edits, deletes, additions } = overrides;
@@ -77,6 +128,16 @@ export default function useWardrobe() {
     setSyncStatus("syncing");
     try {
       const fresh = await fetchAllTabs();
+
+      // Remap outfit IDs in localStorage from old index-based format to new
+      // stable format (matched by tab + item name). Dispatches an event so
+      // useOutfits can reload its state and push corrected IDs to the backend.
+      if (remoteRef.current.length) {
+        const remap    = buildIdRemap(remoteRef.current, fresh);
+        const migrated = applyRemapToOutfitStorage(remap);
+        if (migrated) window.dispatchEvent(new Event("wardrobe-outfit-ids-remapped"));
+      }
+
       remoteRef.current = fresh;
       trySave(CACHE_KEY, { items: fresh, fetchedAt: Date.now() });
       const merged = applyOverrides(fresh, overridesRef.current);

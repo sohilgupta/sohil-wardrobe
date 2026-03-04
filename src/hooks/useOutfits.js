@@ -219,6 +219,23 @@ export default function useOutfits() {
     return () => clearInterval(interval);
   }, [fetchFromBackend]);
 
+  /* ── Re-load after wardrobe ID remap (index-based → stable IDs) ── */
+  useEffect(() => {
+    function handleRemap() {
+      // localStorage was already updated by the migration; reload state from it
+      // and push new IDs to backend so the stale backend doesn't overwrite them.
+      const local = loadLocal();
+      outfitRef.current    = local.outfitIds;
+      frozenRef.current    = local.frozenDays;
+      updatedAtRef.current = local.updatedAt;
+      _setOutfitIds(local.outfitIds);
+      _setFrozenDays(local.frozenDays);
+      pushToBackend(local.outfitIds, local.frozenDays, local.updatedAt);
+    }
+    window.addEventListener("wardrobe-outfit-ids-remapped", handleRemap);
+    return () => window.removeEventListener("wardrobe-outfit-ids-remapped", handleRemap);
+  }, [pushToBackend]);
+
   /* ── setOutfitIds: update outfit slots + detect changed days for updatedAt ── */
   const setOutfitIds = useCallback((updater) => {
     _setOutfitIds((prev) => {
