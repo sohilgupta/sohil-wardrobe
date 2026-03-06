@@ -266,14 +266,26 @@ Output ONLY a single JSON object (no markdown, no code blocks):
   const rawText = await callAI({ system: SYSTEM_STYLIST, userContent: prompt, maxTokens: 2000 });
   const parsed = extractJSON(rawText);
 
-  // Validate all IDs against Trip Item Pool (or full wardrobe as fallback)
+  // Step 1: validate against trip item pool (or full wardrobe when no pool)
   const result = {};
   ["base", "mid", "outer", "bottom", "shoes"].forEach((layer) => {
     const id = parsed[layer];
     result[layer] = id && validIds.has(id) ? id : null;
   });
 
-  if (!result.base && !result.bottom && !result.shoes) {
+  // Step 2: for required layers still null, fall back to full wardrobe validation
+  // (handles edge case where AI returns a valid wardrobe ID not in the pool)
+  if (!result.base || !result.bottom || !result.shoes) {
+    const allIds = new Set(wardrobe.map((i) => i.id));
+    ["base", "bottom", "shoes"].forEach((layer) => {
+      if (!result[layer]) {
+        const id = parsed[layer];
+        result[layer] = id && allIds.has(id) ? id : null;
+      }
+    });
+  }
+
+  if (!result.base || !result.bottom || !result.shoes) {
     throw new Error("AI returned an invalid outfit. Try again.");
   }
   return result;
