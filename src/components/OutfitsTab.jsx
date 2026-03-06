@@ -268,6 +268,7 @@ export default function OutfitsTab({
   toggleFreeze,
   focusDayId = null,
   onFocusConsumed,
+  capsuleIds,   // Set<itemId> — from useCapsule, passed through for picker + AI gen
 }) {
   const [selectedDay, setSelectedDay] = useState(TRIP[0]);
   const [aiLoading,   setAiLoading]   = useState(false);
@@ -323,7 +324,7 @@ export default function OutfitsTab({
     setAiError(null);
     setAiDone(false);
     try {
-      await generateTripOutfits({ wardrobe, frozenDays, setOutfitIds });
+      await generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, capsuleIds });
       setAiDone(true);
       setTimeout(() => setAiDone(false), 3000);
     } catch (err) {
@@ -357,6 +358,7 @@ export default function OutfitsTab({
         weather: effectiveDay.w,
         city:    effectiveDay.city,
         act:     slot === "daytime" ? effectiveDay.day : effectiveDay.night,
+        capsuleIds,
       });
 
       // Re-apply REMOVED sentinels so the user's explicit layer removals are kept
@@ -742,6 +744,7 @@ export default function OutfitsTab({
           currentId={pickerCurrentId}
           outfitIds={outfitIds}
           frozenDays={frozenDays}
+          capsuleIds={capsuleIds}
           onSelect={handlePickerSelect}
           onClose={() => setPickerLayer(null)}
         />

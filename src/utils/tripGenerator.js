@@ -54,10 +54,24 @@ function validateSlot(slot, wardrobeIds) {
   return result;
 }
 
-/* ── Build compact wardrobe text (travel-ready items preferred) ────────────── */
-function buildWardrobeText(wardrobe) {
-  const travelItems = wardrobe.filter((i) => i.t === "Yes");
-  const pool = travelItems.length >= 15 ? travelItems : wardrobe;
+/* ── Build compact wardrobe text ──────────────────────────────────────────────
+   If capsuleIds is provided and non-empty, restrict to those items.
+   Otherwise fall back to travel-ready items (or full wardrobe as last resort). */
+function buildWardrobeText(wardrobe, capsuleIds) {
+  let pool = wardrobe;
+
+  if (capsuleIds && capsuleIds.size > 0) {
+    // Use capsule items only
+    pool = wardrobe.filter((i) => capsuleIds.has(i.id));
+    // Fallback: capsule may not cover all layers — append non-capsule items
+    // so the AI always has at least some options per layer.
+    if (pool.length < 10) pool = wardrobe;
+  } else {
+    // Original behaviour: prefer travel-ready items
+    const travelItems = wardrobe.filter((i) => i.t === "Yes");
+    pool = travelItems.length >= 15 ? travelItems : wardrobe;
+  }
+
   return pool.map((i) => `${i.id}|${i.n}|${i.l || "?"}|${i.col}|${i.c}`).join("\n");
 }
 
@@ -109,8 +123,8 @@ export function countUniqueItems(outfitIds) {
      onBatchDone   — optional callback after each batch (for progress updates)
    Returns:        number of days generated
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, onBatchDone }) {
-  const wardrobeText = buildWardrobeText(wardrobe);
+export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, onBatchDone, capsuleIds }) {
+  const wardrobeText = buildWardrobeText(wardrobe, capsuleIds);
   const daysToGen = TRIP.filter((d) => !frozenDays[d.id]);
 
   if (daysToGen.length === 0)
@@ -159,8 +173,8 @@ export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, 
    generateSingleOutfit — one outfit for given occasion / weather / context
    Returns { base, mid, outer, bottom, shoes } with validated IDs (or null)
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateSingleOutfit({ wardrobe, occ, weather, city, act }) {
-  const wardrobeText = buildWardrobeText(wardrobe);
+export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, capsuleIds }) {
+  const wardrobeText = buildWardrobeText(wardrobe, capsuleIds);
   const wardrobeIds = new Set(wardrobe.map((i) => i.id));
 
   const contextLines = [
@@ -201,6 +215,59 @@ Output ONLY a single JSON object (no markdown, no code blocks):
     throw new Error("AI returned an invalid outfit. Try again.");
   }
   return result;
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+   generateCapsuleWithAI — selects ~25–35 versatile items for the trip capsule.
+   Takes the full wardrobe (so the AI can consider all options) and returns an
+   array of item IDs chosen for maximum versatility, layering, and efficiency.
+   ─────────────────────────────────────────────────────────────────────────── */
+export async function generateCapsuleWithAI({ wardrobe }) {
+  if (wardrobe.length === 0) throw new Error("Wardrobe is empty.");
+
+  // Build a richer per-item description including weather tag
+  const allItemsText = wardrobe
+    .map((i) => `${i.id}|${i.n}|${i.l || "?"}|${i.col}|${i.c}|${i.w || "?"}`)
+    .join("\n");
+
+  // Summarise trip weather + activities from TRIP data
+  const tripSummary = TRIP
+    .map((d) => `${d.date}: ${d.city}, Weather: ${d.w}, Day: ${d.day || d.occ}, Evening: ${d.night || "Casual"}`)
+    .join("\n");
+
+  const SYSTEM_CAPSULE =
+    "You are an expert travel packing consultant. Output ONLY valid JSON with no markdown, code blocks, or explanation. Never invent item IDs — use only exact IDs from the provided catalog.";
+
+  const prompt = `FULL WARDROBE (ID|Name|Layer|Color|Category|Weather):
+${allItemsText}
+
+TRIP SCHEDULE:
+${tripSummary}
+
+TASK: Select 25–35 versatile items that form a complete travel capsule for this specific trip.
+
+SELECTION RULES:
+1. Cover all weather conditions present in the trip schedule
+2. Include items for all activity types (hiking, dinner, casual, flights, shows)
+3. Ensure layering coverage: at least 3 base layers, 2 mid layers, 2 outer layers
+4. Include at least 2 bottoms, 2–3 pairs of shoes
+5. Prioritize items that can work across multiple occasions
+6. Prefer neutral colors for versatility; a few accent pieces are fine
+7. Prioritize packing efficiency (fewer unique items that mix and match)
+8. Only use exact IDs from the catalog above
+
+Output ONLY a JSON object:
+{"capsuleIds": ["ID1", "ID2", "ID3"]}`;
+
+  const rawText = await callAI({ system: SYSTEM_CAPSULE, userContent: prompt, maxTokens: 2000 });
+  const parsed = extractJSON(rawText);
+
+  if (!Array.isArray(parsed.capsuleIds)) {
+    throw new Error("AI returned invalid capsule format. Try again.");
+  }
+
+  const validIds = new Set(wardrobe.map((i) => i.id));
+  return parsed.capsuleIds.filter((id) => validIds.has(id));
 }
 
 /* ────────────────────────────────────────────────────────────────────────────

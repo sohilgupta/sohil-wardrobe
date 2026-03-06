@@ -25,7 +25,7 @@ const LAYER_LABEL = {
 const LAYER_ICON = { Base: "👕", Mid: "🧶", Outer: "🧥", Bottom: "👖", Footwear: "👟" };
 
 /* ─── PACKING LIST ─────────────────────────────────────────────────────────── */
-export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, frozenDays = {} }) {
+export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, frozenDays = {}, capsuleIds }) {
   const [checked, setChecked] = useState({});
 
   /* ── Optimizer state ── */
@@ -58,8 +58,8 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
     setTimeout(() => setOptApplied(false), 4000);
   }
 
-  /* ── Build packing list — FROZEN days only, daytime + evening slots ── */
-  const { groups, totalItems, frozenCount, totalDays } = useMemo(() => {
+  /* ── Build packing list — frozen-day outfit items + capsule items ── */
+  const { groups, capsuleOnlyGroups, totalItems, capsuleOnlyCount, frozenCount, totalDays } = useMemo(() => {
     const usage = {}; // itemId → how many outfit slots it appears in
     let frozenWithOutfits = 0;
 
@@ -104,18 +104,35 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
     // Sort each group by usage count (most-worn first)
     Object.values(grp).forEach((g) => g.sort((a, b) => b._useCount - a._useCount));
 
+    // Capsule-only items: in capsule but NOT already in outfit-based packing
+    const outfitItemIds = new Set(Object.keys(usage));
+    const capsuleOnlyItems = (capsuleIds && capsuleIds.size > 0)
+      ? wardrobe
+          .filter((i) => capsuleIds.has(i.id) && !outfitItemIds.has(i.id))
+          .map((i) => ({ ...i, _useCount: 0 }))
+      : [];
+
+    const capsuleGrp = {};
+    capsuleOnlyItems.forEach((item) => {
+      const layer = item.l || "Base";
+      if (!capsuleGrp[layer]) capsuleGrp[layer] = [];
+      capsuleGrp[layer].push(item);
+    });
+
     // Count total frozen days (regardless of whether they have outfits)
     const totalFrozen = Object.values(frozenDays).filter(Boolean).length;
 
     return {
       groups: grp,
+      capsuleOnlyGroups: capsuleGrp,
       totalItems: items.length,
+      capsuleOnlyCount: capsuleOnlyItems.length,
       frozenCount: frozenWithOutfits,
       totalDays: totalFrozen,
     };
-  }, [outfitIds, frozenDays, wardrobe]);
+  }, [outfitIds, frozenDays, wardrobe, capsuleIds]);
 
-  const hasData = totalItems > 0;
+  const hasData = totalItems > 0 || capsuleOnlyCount > 0;
   const done = Object.values(checked).filter(Boolean).length;
 
   /* ── Empty state ── */
@@ -475,6 +492,97 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
           })}
         </div>
       ))}
+
+      {/* ── Trip Capsule section (items in capsule but not in any outfit) ── */}
+      {capsuleOnlyCount > 0 && (
+        <div style={{ marginTop: 8, marginBottom: 24 }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 10,
+          }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: "#2DD4BF", letterSpacing: 1.5 }}>
+              ✈ TRIP CAPSULE · NOT IN OUTFITS ({capsuleOnlyCount})
+            </p>
+          </div>
+          {LAYER_ORDER.filter((l) => capsuleOnlyGroups[l]).map((layer) => (
+            <div key={layer} style={{ marginBottom: 16 }}>
+              <p style={{ fontSize: 10, fontWeight: 700, color: T.light, letterSpacing: 1.5, marginBottom: 8 }}>
+                {LAYER_ICON[layer]} {LAYER_LABEL[layer].toUpperCase()} ({capsuleOnlyGroups[layer].length})
+              </p>
+              {capsuleOnlyGroups[layer].map((item) => {
+                const [bg, ac] = swatch(item.col);
+                const isPacked = checked[item.id];
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => setChecked((c) => ({ ...c, [item.id]: !c[item.id] }))}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      background: isPacked ? T.alt : T.surface,
+                      border: `1.5px solid ${isPacked ? T.borderLight : "#0D2E2B"}`,
+                      borderRadius: 12,
+                      padding: "10px 14px",
+                      marginBottom: 8,
+                      cursor: "pointer",
+                      opacity: isPacked ? 0.55 : 1,
+                      transition: "all 0.15s",
+                    }}
+                  >
+                    {/* Image / color swatch */}
+                    <div style={{
+                      width: 42, height: 42, borderRadius: 10, flexShrink: 0,
+                      overflow: "hidden",
+                      background: `linear-gradient(145deg,${bg},${ac})`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {item.img ? (
+                        <img src={item.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => (e.target.style.display = "none")} />
+                      ) : null}
+                    </div>
+
+                    {/* Item info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{
+                        fontSize: 13, fontWeight: 600, color: T.text,
+                        textDecoration: isPacked ? "line-through" : "none",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}>
+                        {item.n}
+                      </p>
+                      <p style={{ fontSize: 11, color: T.light, marginTop: 1 }}>{item.b} · {item.col}</p>
+                    </div>
+
+                    {/* Capsule badge */}
+                    <div style={{
+                      flexShrink: 0, fontSize: 8, fontWeight: 700,
+                      color: "#2DD4BF", background: "#0D2E2B",
+                      border: "1px solid #14B8A6", borderRadius: 20,
+                      padding: "2px 7px", whiteSpace: "nowrap",
+                    }}>
+                      ✈ CAPSULE
+                    </div>
+
+                    {/* Checkbox */}
+                    <div style={{
+                      width: 22, height: 22, borderRadius: "50%",
+                      border: `2px solid ${isPacked ? T.green : T.border}`,
+                      background: isPacked ? T.green : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      flexShrink: 0, transition: "all 0.15s",
+                    }}>
+                      {isPacked && <span style={{ color: "#fff", fontSize: 11 }}>✓</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* ── Footer ── */}
       <p style={{ fontSize: 9, color: T.light, textAlign: "center", marginTop: 8, letterSpacing: 0.5 }}>

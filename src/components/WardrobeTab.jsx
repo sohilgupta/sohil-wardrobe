@@ -252,10 +252,53 @@ export default function WardrobeTab({
                 <div style={{ display: "flex", gap: 16, marginBottom: 16 }}>
                   <ItemVisual item={detail} size={110} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontSize: 16, fontWeight: 700, color: T.text, lineHeight: 1.3, marginBottom: 4 }}>{detail.n || detail.itemName}</p>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6, marginBottom: 4 }}>
+                      <p style={{ fontSize: 16, fontWeight: 700, color: T.text, lineHeight: 1.3, flex: 1 }}>{detail.n || detail.itemName}</p>
+                      {detail.productUrl && (
+                        <a
+                          href={detail.productUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="View product page"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 26,
+                            height: 26,
+                            borderRadius: 8,
+                            background: T.alt,
+                            border: `1.5px solid ${T.border}`,
+                            color: T.mid,
+                            fontSize: 13,
+                            textDecoration: "none",
+                            flexShrink: 0,
+                            cursor: "pointer",
+                          }}
+                        >
+                          ↗
+                        </a>
+                      )}
+                    </div>
                     <p style={{ fontSize: 13, color: T.mid, marginBottom: 4 }}>{detail.b || detail.brand}</p>
                     {detail.productCode && (
-                      <p style={{ fontSize: 10, color: T.light, marginBottom: 8, fontFamily: "monospace" }}>#{detail.productCode}</p>
+                      <p style={{ fontSize: 10, color: T.light, marginBottom: 6, fontFamily: "monospace" }}>#{detail.productCode}</p>
+                    )}
+                    {/* Price + Purchase Date */}
+                    {(detail.price || detail.purchaseDate) && (
+                      <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                        {detail.price && (
+                          <span style={{ fontSize: 11, color: "#4ADE80", fontWeight: 700 }}>
+                            {detail.price}
+                          </span>
+                        )}
+                        {detail.purchaseDate && (
+                          <span style={{ fontSize: 10, color: T.light }}>
+                            Bought {detail.purchaseDate}
+                          </span>
+                        )}
+                      </div>
                     )}
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                       <Chip text={detail.col || detail.color} />
@@ -365,14 +408,38 @@ export default function WardrobeTab({
               {item._source === "local" && (
                 <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(60,20,100,0.85)", color: "#A78BFA", fontSize: 8, fontWeight: 700, padding: "2px 5px", borderRadius: 5 }}>LOCAL</div>
               )}
+              {item.productUrl && (
+                <a
+                  href={item.productUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  title="View product"
+                  style={{
+                    position: "absolute", bottom: 6, right: 6,
+                    background: "rgba(0,0,0,0.65)",
+                    color: "#E8E6E1",
+                    fontSize: 10,
+                    padding: "2px 5px",
+                    borderRadius: 6,
+                    textDecoration: "none",
+                    lineHeight: 1,
+                  }}
+                >
+                  ↗
+                </a>
+              )}
             </div>
             <div style={{ padding: "8px 2px 0" }}>
               <p style={{ fontSize: 11, fontWeight: 600, color: T.text, lineHeight: 1.3, marginBottom: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                 {item.n || item.itemName}
               </p>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                 <Chip text={item.col || item.color} />
                 <Chip text={item.w} colors={T.weather[item.w]} />
+                {item.price && (
+                  <span style={{ fontSize: 9, color: "#4ADE80", fontWeight: 700 }}>{item.price}</span>
+                )}
               </div>
             </div>
           </div>

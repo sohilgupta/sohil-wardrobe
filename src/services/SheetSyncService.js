@@ -164,16 +164,18 @@ function normalizeTab(tabName, gvizData) {
     throw new Error(`Tab "${tabName}" returned no columns — sheet may be private`);
 
   const colIdx = {
-    name:        findColByLabel(cols, "item name", "name"),
-    category:    findColByLabel(cols, "category"),
-    color:       findColByLabel(cols, "color", "colour"),
-    brand:       findColByLabel(cols, "brand"),
-    productCode: findColByLabel(cols, "product code", "sku", "code"),
-    imageUrl:    findColByLabel(cols, "image url", "image / image url", "image/image url", "imageurl"),
-    image:       findColByLabel(cols, "image"),   // fallback embedded-image column
-    notes:       findColByLabel(cols, "notes", "note"),
-    size:        findColByLabel(cols, "size"),
-    price:       findColByLabel(cols, "price"),
+    name:         findColByLabel(cols, "item name", "name"),
+    category:     findColByLabel(cols, "category"),
+    color:        findColByLabel(cols, "color", "colour"),
+    brand:        findColByLabel(cols, "brand"),
+    productCode:  findColByLabel(cols, "product code", "sku", "code"),
+    imageUrl:     findColByLabel(cols, "image url", "image / image url", "image/image url", "imageurl"),
+    image:        findColByLabel(cols, "image"),   // fallback embedded-image column
+    notes:        findColByLabel(cols, "notes", "note"),
+    size:         findColByLabel(cols, "size"),
+    price:        findColByLabel(cols, "price"),
+    productUrl:   findColByLabel(cols, "product url", "product link", "link", "url", "shop url"),
+    purchaseDate: findColByLabel(cols, "purchase date", "purchased", "date purchased", "bought on", "purchase"),
   };
 
   // Prefer "image url" column; fall back to "image" column
@@ -195,6 +197,18 @@ function normalizeTab(tabName, gvizData) {
       const brand       = cellVal(row, colIdx.brand);
       const productCode = cellVal(row, colIdx.productCode);
       const imgRaw      = cellVal(row, imgColIdx);
+
+      // Extract hyperlink URL from name cell's gviz `p.link` property.
+      // When a cell contains =HYPERLINK(url, text) or an inserted link,
+      // Google's gviz endpoint exposes the URL in row.c[idx].p?.link.
+      const nameCell = row.c?.[colIdx.name];
+      const hyperlinkUrl = nameCell?.p?.link || "";
+
+      // Explicit product URL column takes precedence over name-cell hyperlink
+      const productUrlRaw = colIdx.productUrl !== -1 ? cellVal(row, colIdx.productUrl) : "";
+      const productUrl    = productUrlRaw || hyperlinkUrl;
+
+      const purchaseDate = colIdx.purchaseDate !== -1 ? cellVal(row, colIdx.purchaseDate) : "";
 
       // Stable ID: tab + full name + brand — NOT row-index-dependent.
       // Using idx in the ID meant inserting/removing any row above an item in
@@ -223,9 +237,11 @@ function normalizeTab(tabName, gvizData) {
         img: resolveImg(imgRaw),
         // ─ extended fields
         productCode,
-        notes:    cellVal(row, colIdx.notes),
-        size:     cellVal(row, colIdx.size),
-        price:    cellVal(row, colIdx.price),
+        notes:        cellVal(row, colIdx.notes),
+        size:         cellVal(row, colIdx.size),
+        price:        cellVal(row, colIdx.price),
+        productUrl,
+        purchaseDate,
         // ─ derived outfit-engine fields
         l:   effectiveLayer, // "Outer" | "Mid" | "Base" | "Bottom" | "Footwear"
         occ,                // "Casual" | "Gym"

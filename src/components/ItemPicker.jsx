@@ -246,6 +246,7 @@ export default function ItemPicker({
   currentId,
   outfitIds  = {},
   frozenDays = {},
+  capsuleIds,   // Set<itemId> — if non-empty, default to capsule-only view
   onSelect,
   onClose,
 }) {
@@ -255,15 +256,29 @@ export default function ItemPicker({
   const filterFn   = LAYER_FILTER[layer];
   const layerLabel = LAYER_LABELS[layer] || layer;
 
+  /* Determine if capsule filtering is available for this layer */
+  const layerPool = filterFn ? wardrobe.filter(filterFn) : wardrobe;
+  const capsuleInLayer = capsuleIds && capsuleIds.size > 0
+    ? layerPool.filter((i) => capsuleIds.has(i.id)).length
+    : 0;
+  const hasCapsule = capsuleInLayer > 0;
+
+  /* Default to capsule-only if capsule has items for this layer */
+  const [showAll, setShowAll] = useState(!hasCapsule);
+
   /* Precompute usage stats — recomputes only when outfit/freeze state changes */
   const usageStats = useMemo(
     () => computeUsageStats(outfitIds, frozenDays),
     [outfitIds, frozenDays]
   );
 
-  /* Filter by layer field (l), then by search query */
+  /* Filter by layer, then capsule/all toggle, then search query */
   const filtered = useMemo(() => {
-    const pool = filterFn ? wardrobe.filter(filterFn) : wardrobe;
+    let pool = filterFn ? wardrobe.filter(filterFn) : wardrobe;
+    // Capsule filter
+    if (!showAll && capsuleIds && capsuleIds.size > 0) {
+      pool = pool.filter((i) => capsuleIds.has(i.id));
+    }
     if (!q.trim()) return pool;
     const lq = q.toLowerCase();
     return pool.filter(
@@ -273,7 +288,7 @@ export default function ItemPicker({
         (i.b || i.brand || "").toLowerCase().includes(lq) ||
         (i.productCode || "").toLowerCase().includes(lq)
     );
-  }, [wardrobe, layer, q]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [wardrobe, layer, showAll, capsuleIds, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Sort by score descending, then alphabetical — applied to search results too */
   const sorted = useMemo(() => {
@@ -349,28 +364,54 @@ export default function ItemPicker({
             flexShrink: 0,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <div>
               <p style={{ fontSize: 15, fontWeight: 700, color: T.text }}>
                 Pick · {layerLabel}
               </p>
               <p style={{ fontSize: 11, color: T.mid, marginTop: 2 }}>
                 {filtered.length} item{filtered.length !== 1 ? "s" : ""}
+                {hasCapsule && !showAll && (
+                  <span style={{ color: "#2DD4BF", marginLeft: 4 }}>· capsule only</span>
+                )}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              style={{
-                background: "none",
-                border: "none",
-                color: T.mid,
-                fontSize: 18,
-                cursor: "pointer",
-                padding: "4px 8px",
-              }}
-            >
-              ✕
-            </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {/* Capsule / All toggle — only shown when capsule has items for this layer */}
+              {hasCapsule && (
+                <button
+                  onClick={() => setShowAll((v) => !v)}
+                  style={{
+                    padding: "4px 10px",
+                    borderRadius: 20,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: 0.5,
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    border: showAll ? `1.5px solid ${T.border}` : "1.5px solid #14B8A6",
+                    background: showAll ? "none" : "#0D2E2B",
+                    color: showAll ? T.light : "#2DD4BF",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {showAll ? "All Items" : "✈ Capsule"}
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: T.mid,
+                  fontSize: 18,
+                  cursor: "pointer",
+                  padding: "4px 8px",
+                }}
+              >
+                ✕
+              </button>
+            </div>
           </div>
 
           {/* Search */}

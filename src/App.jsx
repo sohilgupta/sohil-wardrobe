@@ -2,20 +2,21 @@ import { useState, useEffect } from "react";
 import { T } from "./theme";
 import useWardrobe from "./hooks/useWardrobe";
 import useOutfits from "./hooks/useOutfits";
+import useCapsule from "./hooks/useCapsule";
 import WardrobeTab from "./components/WardrobeTab";
 import TripTab from "./components/TripTab";
 import OutfitTab from "./components/OutfitTab";
-import AddTab from "./components/AddTab";
 import PackTab from "./components/PackTab";
 import OutfitsTab from "./components/OutfitsTab";
+import CapsuleTab from "./components/CapsuleTab";
 import LoginPage from "./components/LoginPage";
 
 const NAV = [
   { id: "wardrobe", icon: "⊞", label: "WARDROBE" },
+  { id: "capsule",  icon: "◈", label: "CAPSULE" },
   { id: "trip",     icon: "✈", label: "TRIP" },
   { id: "daily",    icon: "◫", label: "DAILY" },
   { id: "outfit",   icon: "✦", label: "OUTFIT AI" },
-  { id: "add",      icon: "+", label: "ADD" },
   { id: "packing",  icon: "⊛", label: "PACKING" },
 ];
 
@@ -94,7 +95,11 @@ function AuthenticatedApp({ onLogout }) {
   // Outfit-per-day state — shared between Daily and Packing tabs
   const { outfitIds, setOutfitIds, frozenDays, toggleFreeze } = useOutfits();
 
+  // Trip Capsule — curated item subset for outfit planning + AI generation
+  const { capsuleIds, toggleCapsule, setManyCapsule, clearCapsule } = useCapsule();
+
   const travel = wardrobe.filter((i) => i.t === "Yes").length;
+  const capsuleCount = capsuleIds.size;
 
   // Navigate to Daily tab and focus a specific day
   function navigateToDay(dayId) {
@@ -173,6 +178,24 @@ function AuthenticatedApp({ onLogout }) {
                 </p>
                 <p style={{ fontSize: 8, color: T.light, letterSpacing: 1, marginTop: 1 }}>TRAVEL</p>
               </div>
+              {capsuleCount > 0 && (
+                <button
+                  onClick={() => setTab("capsule")}
+                  title="View Trip Capsule"
+                  style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: 0,
+                    textAlign: "center",
+                  }}
+                >
+                  <p style={{ fontSize: 14, fontWeight: 700, color: "#2DD4BF", lineHeight: 1 }}>
+                    {capsuleCount}
+                  </p>
+                  <p style={{ fontSize: 8, color: "#2DD4BF", letterSpacing: 1, marginTop: 1 }}>CAPSULE</p>
+                </button>
+              )}
               {/* Logout */}
               <button
                 onClick={onLogout}
@@ -255,11 +278,19 @@ function AuthenticatedApp({ onLogout }) {
             onAdd={addItem}
           />
         )}
+        {tab === "capsule" && (
+          <CapsuleTab
+            wardrobe={wardrobe}
+            capsuleIds={capsuleIds}
+            toggleCapsule={toggleCapsule}
+            setManyCapsule={setManyCapsule}
+            clearCapsule={clearCapsule}
+          />
+        )}
         {tab === "trip"    && <TripTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} onNavigateToDay={navigateToDay} />}
-        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} toggleFreeze={toggleFreeze} focusDayId={focusDayId} onFocusConsumed={() => setFocusDayId(null)} />}
+        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} toggleFreeze={toggleFreeze} focusDayId={focusDayId} onFocusConsumed={() => setFocusDayId(null)} capsuleIds={capsuleIds} />}
         {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} />}
-        {tab === "add"     && <AddTab     onAdd={addItem} />}
-        {tab === "packing" && <PackTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} />}
+        {tab === "packing" && <PackTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} capsuleIds={capsuleIds} />}
       </div>
     </div>
   );
