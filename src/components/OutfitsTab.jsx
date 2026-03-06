@@ -18,13 +18,14 @@
    null = slot disabled (optional slots). {} = slot enabled, outfit not yet generated.
    ─────────────────────────────────────────────────────────────────────────── */
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { T } from "../theme";
 import TRIP from "../data/trip";
-import { generateTripOutfits, generateSingleOutfit } from "../utils/tripGenerator";
+import { generateTripOutfits, generateSingleOutfit, buildTripItemPool } from "../utils/tripGenerator";
 import OutfitCard from "./OutfitCard";
 import ItemPicker from "./ItemPicker";
 import Chip from "./Chip";
+import { computeUsageStats } from "./ItemPicker";
 
 /* ─── Slot configs ────────────────────────────────────────────────────────── */
 const SLOT_CONFIGS = {
@@ -181,6 +182,7 @@ function SlotSection({
   slotIds, slotOutfit,
   isFrozen, isLoading,
   onPick, onRegenerate, onRemoveLayer, onAddLayer,
+  usageStats,       // { [itemId]: { count, ... } } — for ×N used badges on OutfitCard
 }) {
   const midActive           = optionalLayers.includes("mid")           && !!(slotIds?.mid           && slotIds.mid           !== "REMOVED");
   const outerActive         = optionalLayers.includes("outer")         && !!(slotIds?.outer         && slotIds.outer         !== "REMOVED");
@@ -275,6 +277,7 @@ function SlotSection({
           onSwap={isFrozen ? null : onPick}
           onRegenerate={isFrozen ? null : onRegenerate}
           loading={isLoading}
+          usageStats={usageStats}
         />
       )}
 
@@ -321,6 +324,18 @@ export default function OutfitsTab({
   const [pickerLayer, setPickerLayer] = useState(null);
 
   const isMobile = useIsMobile();
+
+  /* ── Trip Item Pool (capsule ∪ frozen outfit items, null if <8 items) ── */
+  const tripItemPool = useMemo(
+    () => buildTripItemPool({ wardrobe, capsuleIds, outfitIds, frozenDays }),
+    [wardrobe, capsuleIds, outfitIds, frozenDays]
+  );
+
+  /* ── Usage stats across all 6 slots (for ×N used badges) ── */
+  const usageStats = useMemo(
+    () => computeUsageStats(outfitIds, frozenDays),
+    [outfitIds, frozenDays]
+  );
 
   /* ── Auto-select day when navigated from Trip tab ── */
   useEffect(() => {
@@ -371,7 +386,7 @@ export default function OutfitsTab({
     setAiError(null);
     setAiDone(false);
     try {
-      await generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, capsuleIds });
+      await generateTripOutfits({ wardrobe, frozenDays, outfitIds, setOutfitIds, capsuleIds });
       setAiDone(true);
       setTimeout(() => setAiDone(false), 3000);
     } catch (err) {
@@ -419,6 +434,8 @@ export default function OutfitsTab({
         city:    selectedDay.city,
         act:     slotAct,
         capsuleIds,
+        outfitIds,
+        frozenDays,
       });
 
       // Re-apply REMOVED sentinels so the user's explicit layer removals are kept
@@ -535,6 +552,12 @@ export default function OutfitsTab({
         <p style={{ fontSize: 11, color: T.mid }}>
           AUS & NZ — April 2026 · {plannedCount}/{TRIP.length} planned · {frozenCount} frozen · {wardrobe.length} items
         </p>
+        {tripItemPool && (
+          <p style={{ fontSize: 10, color: "#2DD4BF", marginTop: 4, display: "flex", alignItems: "center", gap: 5 }}>
+            <span>✦</span>
+            <span>Using {tripItemPool.size} trip capsule items for generation</span>
+          </p>
+        )}
       </div>
 
       {/* ── AI Generate Button ── */}
@@ -757,6 +780,7 @@ export default function OutfitsTab({
                   onRegenerate={() => regenSlot("daytime")}
                   onRemoveLayer={(layer) => handleRemoveLayer("daytime", layer)}
                   onAddLayer={(layer) => handleAddLayer("daytime", layer)}
+                  usageStats={usageStats}
                 />
 
                 {/* ── Divider ── */}
@@ -778,6 +802,7 @@ export default function OutfitsTab({
                   onRegenerate={() => regenSlot("evening")}
                   onRemoveLayer={(layer) => handleRemoveLayer("evening", layer)}
                   onAddLayer={(layer) => handleAddLayer("evening", layer)}
+                  usageStats={usageStats}
                 />
 
                 {/* ── Optional occasion slots ── */}
@@ -804,6 +829,7 @@ export default function OutfitsTab({
                         onRegenerate={() => regenSlot(slot)}
                         onRemoveLayer={(layer) => handleRemoveLayer(slot, layer)}
                         onAddLayer={(layer) => handleAddLayer(slot, layer)}
+                        usageStats={usageStats}
                       />
                     </div>
                   );
@@ -880,6 +906,8 @@ export default function OutfitsTab({
           outfitIds={outfitIds}
           frozenDays={frozenDays}
           capsuleIds={capsuleIds}
+          dayWeather={selectedDay?.w}
+          dayOcc={selectedDay?.occ}
           onSelect={handlePickerSelect}
           onClose={() => setPickerLayer(null)}
         />

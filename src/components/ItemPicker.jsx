@@ -28,15 +28,18 @@ const LAYER_LABELS = {
   shoes:         "Shoes",
 };
 
+/* ─── All outfit slot names (used to scan usage across all occasions) ──────── */
+const ALL_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
+
 /* ─── Usage stats precomputation ─────────────────────────────────────────────
-   Iterates all outfitIds to build per-item stats:
+   Iterates all outfitIds (all 6 slot types) to build per-item stats:
      count     – total appearances across all days + slots
      inFrozen  – appears in at least one frozen day
      inAny     – appears in any planned day
      inRecent  – in the first 3 TRIP days that have outfits planned
-                 (proxy for "recently planned" since trips are built sequentially)
+   Exported so OutfitsTab can import it for OutfitCard usage badges.
    ─────────────────────────────────────────────────────────────────────────── */
-function computeUsageStats(outfitIds, frozenDays) {
+export function computeUsageStats(outfitIds, frozenDays) {
   const stats = {};
 
   const recentDayIds = new Set(
@@ -50,7 +53,8 @@ function computeUsageStats(outfitIds, frozenDays) {
     const isFrozen = frozenDays[dayId] === true;
     const isRecent = recentDayIds.has(dayId);
 
-    const processSlot = (slotIds) => {
+    ALL_SLOTS.forEach((slot) => {
+      const slotIds = dayData[slot];
       if (!slotIds || typeof slotIds !== "object") return;
       Object.values(slotIds).forEach((itemId) => {
         if (!itemId || itemId === "REMOVED") return;
@@ -62,15 +66,48 @@ function computeUsageStats(outfitIds, frozenDays) {
         if (isFrozen) stats[itemId].inFrozen = true;
         if (isRecent) stats[itemId].inRecent = true;
       });
-    };
-
-    processSlot(dayData.daytime);
-    processSlot(dayData.evening);
+    });
   });
 
   return stats;
 }
 
+/* ─── Full scoring formula for Suggested section ─────────────────────────────
+   score =
+     (inFrozenOutfits × 30) + (inPackingOnly × 25) +
+     (usageCount × 10) + (recentlyUsed × 5) +
+     (matchesWeather × 15) + (matchesOccasion × 10)
+   ─────────────────────────────────────────────────────────────────────────── */
+function computeFullScore(stats, item, dayWeather, dayOcc, capsuleIds) {
+  const inFrozen   = stats?.inFrozen  || false;
+  // inPackingOnly: in capsule (packing-list eligible) but not in a frozen outfit
+  const inPacking  = !inFrozen && (capsuleIds?.has(item.id) ?? false);
+  const usageCount = stats?.count     || 0;
+  const inRecent   = stats?.inRecent  || false;
+
+  let score = 0;
+  if (inFrozen)  score += 30;
+  if (inPacking) score += 25;
+  score += usageCount * 10;
+  if (inRecent)  score += 5;
+
+  // Weather match: item weather tag matches the day's weather
+  if (dayWeather && item.w) {
+    if (item.w === dayWeather) score += 15;
+    else if (item.w === "All" || item.w === "Any") score += 5;
+  }
+
+  // Occasion match: item occasion tag matches the day's occasion
+  if (dayOcc && item.occ) {
+    const iOcc = (item.occ || "").toLowerCase();
+    const dOcc = (dayOcc  || "").toLowerCase();
+    if (iOcc.includes(dOcc) || dOcc.includes(iOcc)) score += 10;
+  }
+
+  return score;
+}
+
+/* ─── Legacy simple score (used for sorting outside of Suggested) ────────── */
 function itemScore(s) {
   if (!s) return 0;
   return (s.count * 5) + (s.inFrozen ? 20 : 0) + (s.inAny ? 10 : 0) + (s.inRecent ? 5 : 0);
@@ -179,7 +216,7 @@ function Thumb({ item, selected, stats, onSelect }) {
           </div>
         )}
 
-        {/* Frozen badge — hidden when selected (checkmark takes priority) */}
+        {/* Frozen badge — hidden when selected */}
         {inFrozen && !selected && (
           <div
             style={{
@@ -238,6 +275,9 @@ function Thumb({ item, selected, stats, onSelect }) {
 //   currentId   – currently selected item ID (shown as selected)
 //   outfitIds   – full outfit state for usage-based ranking
 //   frozenDays  – frozen state for badge + score boost
+//   capsuleIds  – Set<itemId> — if non-empty, default to capsule-only view
+//   dayWeather  – current day's weather ("Cold"|"Mild"|"Warm") for Suggested scoring
+//   dayOcc      – current day's occasion for Suggested scoring
 //   onSelect(item) – called when user confirms a selection
 //   onClose     – called to dismiss without selecting
 export default function ItemPicker({
@@ -246,7 +286,9 @@ export default function ItemPicker({
   currentId,
   outfitIds  = {},
   frozenDays = {},
-  capsuleIds,   // Set<itemId> — if non-empty, default to capsule-only view
+  capsuleIds,
+  dayWeather,   // NEW — for Suggested scoring
+  dayOcc,       // NEW — for Suggested scoring
   onSelect,
   onClose,
 }) {
@@ -255,6 +297,25 @@ export default function ItemPicker({
 
   const filterFn   = LAYER_FILTER[layer];
   const layerLabel = LAYER_LABELS[layer] || layer;
+
+  /* ── Precompute Trip Item Pool (capsule ∪ frozen outfit items) ── */
+  const tripItemPoolIds = useMemo(() => {
+    const poolIds = new Set();
+    // Add capsule items
+    if (capsuleIds) capsuleIds.forEach((id) => poolIds.add(id));
+    // Add items from frozen outfit slots
+    Object.entries(outfitIds).forEach(([dayId, dayData]) => {
+      if (!frozenDays[dayId] || !dayData) return;
+      ALL_SLOTS.forEach((slot) => {
+        const slotIds = dayData[slot];
+        if (!slotIds) return;
+        Object.values(slotIds).forEach((id) => {
+          if (id && id !== "REMOVED") poolIds.add(id);
+        });
+      });
+    });
+    return poolIds;
+  }, [capsuleIds, outfitIds, frozenDays]);
 
   /* Determine if capsule filtering is available for this layer */
   const layerPool = filterFn ? wardrobe.filter(filterFn) : wardrobe;
@@ -275,7 +336,6 @@ export default function ItemPicker({
   /* Filter by layer, then capsule/all toggle, then search query */
   const filtered = useMemo(() => {
     let pool = filterFn ? wardrobe.filter(filterFn) : wardrobe;
-    // Capsule filter
     if (!showAll && capsuleIds && capsuleIds.size > 0) {
       pool = pool.filter((i) => capsuleIds.has(i.id));
     }
@@ -290,7 +350,7 @@ export default function ItemPicker({
     );
   }, [wardrobe, layer, showAll, capsuleIds, q]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* Sort by score descending, then alphabetical — applied to search results too */
+  /* Sort by legacy score descending, then alphabetical */
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
       const diff = itemScore(usageStats[b.id]) - itemScore(usageStats[a.id]);
@@ -299,26 +359,51 @@ export default function ItemPicker({
     });
   }, [filtered, usageStats]);
 
-  /* Partition into sections — no item appears in more than one section:
-       1. 🔥 Frequently Used  — usageCount ≥ 2
-       2. 📦 In Packing       — inFrozen but not already in Frequently Used
-       3. All Items           — everything else
-     Section headers only rendered when at least one special section exists. */
+  /* ── Sections ─────────────────────────────────────────────────────────────
+     1. ✦ Suggested   — top 6 from TripItemPool for this layer, full score
+     2. 🔥 Frequently Used — usageCount ≥ 2, not already in Suggested
+     3. 📦 In Packing      — inFrozen, not in above
+     4. All Items / Trip Capsule — the rest
+     Each item appears in exactly one section.
+  ── */
   const sections = useMemo(() => {
-    const frequentItems = sorted.filter((i) => (usageStats[i.id]?.count || 0) >= 2);
-    const frequentIds   = new Set(frequentItems.map((i) => i.id));
+    // ── Suggested: top 6 TripItemPool items for this layer, sorted by full score
+    const fullLayerPool = filterFn ? wardrobe.filter(filterFn) : wardrobe;
+    const tripLayerItems = fullLayerPool.filter((i) => tripItemPoolIds.has(i.id));
+    const suggestedSorted = [...tripLayerItems]
+      .sort((a, b) => {
+        const sA = computeFullScore(usageStats[a.id], a, dayWeather, dayOcc, capsuleIds);
+        const sB = computeFullScore(usageStats[b.id], b, dayWeather, dayOcc, capsuleIds);
+        return sB - sA;
+      })
+      .slice(0, 6);
+    const suggestedIds = new Set(suggestedSorted.map((i) => i.id));
 
-    const packedItems   = sorted.filter((i) => usageStats[i.id]?.inFrozen && !frequentIds.has(i.id));
-    const packedIds     = new Set(packedItems.map((i) => i.id));
+    // ── Partition sorted (filtered main pool) into sections, excluding suggested
+    const frequentItems = sorted.filter(
+      (i) => (usageStats[i.id]?.count || 0) >= 2 && !suggestedIds.has(i.id)
+    );
+    const frequentIds = new Set(frequentItems.map((i) => i.id));
 
-    const restItems     = sorted.filter((i) => !frequentIds.has(i.id) && !packedIds.has(i.id));
+    const packedItems = sorted.filter(
+      (i) => usageStats[i.id]?.inFrozen && !frequentIds.has(i.id) && !suggestedIds.has(i.id)
+    );
+    const packedIds = new Set(packedItems.map((i) => i.id));
+
+    const restItems = sorted.filter(
+      (i) => !suggestedIds.has(i.id) && !frequentIds.has(i.id) && !packedIds.has(i.id)
+    );
 
     const result = [];
-    if (frequentItems.length > 0) result.push({ label: "🔥 Frequently Used", items: frequentItems });
-    if (packedItems.length  > 0)  result.push({ label: "📦 In Packing",       items: packedItems  });
-    result.push({ label: "All Items", items: restItems });
+    if (suggestedSorted.length > 0)
+      result.push({ label: "✦ Suggested",      items: suggestedSorted, accent: "#2DD4BF" });
+    if (frequentItems.length > 0)
+      result.push({ label: "🔥 Frequently Used", items: frequentItems });
+    if (packedItems.length > 0)
+      result.push({ label: "📦 In Packing",      items: packedItems });
+    result.push({ label: showAll ? "All Items" : "✈ Trip Capsule", items: restItems });
     return result;
-  }, [sorted, usageStats]);
+  }, [sorted, usageStats, wardrobe, tripItemPoolIds, capsuleIds, dayWeather, dayOcc, filterFn, showAll]);
 
   const hasSpecialSections = sections.length > 1;
 
@@ -374,10 +459,15 @@ export default function ItemPicker({
                 {hasCapsule && !showAll && (
                   <span style={{ color: "#2DD4BF", marginLeft: 4 }}>· capsule only</span>
                 )}
+                {tripItemPoolIds.size > 0 && (
+                  <span style={{ color: "#2DD4BF", marginLeft: 4 }}>
+                    · {tripItemPoolIds.size} trip items
+                  </span>
+                )}
               </p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              {/* Capsule / All toggle — only shown when capsule has items for this layer */}
+              {/* Capsule / All toggle */}
               {hasCapsule && (
                 <button
                   onClick={() => setShowAll((v) => !v)}
@@ -457,7 +547,7 @@ export default function ItemPicker({
             padding: "12px 12px 0",
           }}
         >
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && sections.every((s) => s.items.length === 0) ? (
             <div style={{ textAlign: "center", padding: 40, color: T.light, fontSize: 13 }}>
               No items found
             </div>
@@ -471,7 +561,7 @@ export default function ItemPicker({
                       style={{
                         fontSize: 9,
                         fontWeight: 700,
-                        color: T.mid,
+                        color: section.accent || T.mid,
                         letterSpacing: 1,
                         textTransform: "uppercase",
                         paddingTop: 8,

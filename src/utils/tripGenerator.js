@@ -42,36 +42,64 @@ function extractJSON(rawText) {
   return JSON.parse(rawText.slice(s, e + 1));
 }
 
-/* ── Validate a slot object (required fields + ID must exist in wardrobe) ── */
-function validateSlot(slot, wardrobeIds) {
+/* ── Validate a slot object (required fields + ID must exist in validIds set) */
+function validateSlot(slot, validIds) {
   if (!slot || typeof slot !== "object") return null;
   const result = {};
   ["base", "mid", "outer", "bottom", "shoes"].forEach((layer) => {
     const id = slot[layer];
-    result[layer] = id && wardrobeIds.has(id) ? id : null;
+    result[layer] = id && validIds.has(id) ? id : null;
   });
   if (!result.base || !result.bottom || !result.shoes) return null;
   return result;
 }
 
-/* ── Build compact wardrobe text ──────────────────────────────────────────────
-   If capsuleIds is provided and non-empty, restrict to those items.
-   Otherwise fall back to travel-ready items (or full wardrobe as last resort). */
-function buildWardrobeText(wardrobe, capsuleIds) {
-  let pool = wardrobe;
+/* ── All outfit slot names ─────────────────────────────────────────────────── */
+const ALL_OUTFIT_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
 
-  if (capsuleIds && capsuleIds.size > 0) {
-    // Use capsule items only
-    pool = wardrobe.filter((i) => capsuleIds.has(i.id));
-    // Fallback: capsule may not cover all layers — append non-capsule items
-    // so the AI always has at least some options per layer.
-    if (pool.length < 10) pool = wardrobe;
-  } else {
-    // Original behaviour: prefer travel-ready items
-    const travelItems = wardrobe.filter((i) => i.t === "Yes");
-    pool = travelItems.length >= 15 ? travelItems : wardrobe;
+/* ────────────────────────────────────────────────────────────────────────────
+   buildTripItemPool — compute the Set of approved item IDs for the trip.
+
+   Pool = (capsule items) ∪ (items in any frozen outfit slot)
+   This is the only set of items the AI generators are allowed to use.
+
+   Falls back to null (= full wardrobe) if pool is too small (< 8 items).
+   ─────────────────────────────────────────────────────────────────────────── */
+export function buildTripItemPool({ wardrobe, capsuleIds, outfitIds = {}, frozenDays = {} }) {
+  const poolIds = new Set();
+
+  // 1. Items in the trip capsule
+  if (capsuleIds) {
+    capsuleIds.forEach((id) => poolIds.add(id));
   }
 
+  // 2. Items in any frozen outfit slot (= packing list items)
+  Object.entries(outfitIds).forEach(([dayId, dayData]) => {
+    if (!frozenDays[dayId] || !dayData) return;
+    ALL_OUTFIT_SLOTS.forEach((slot) => {
+      const slotIds = dayData[slot];
+      if (!slotIds) return;
+      Object.values(slotIds).forEach((id) => {
+        if (id && id !== "REMOVED") poolIds.add(id);
+      });
+    });
+  });
+
+  // Return null if pool is too small to reliably generate complete outfits
+  return poolIds.size >= 8 ? poolIds : null;
+}
+
+/* ── Build compact wardrobe text — restricted to TripItemPool when available */
+function buildWardrobeText(wardrobe, tripItemPool) {
+  if (tripItemPool && tripItemPool.size > 0) {
+    const pool = wardrobe.filter((i) => tripItemPool.has(i.id));
+    if (pool.length >= 8) {
+      return pool.map((i) => `${i.id}|${i.n}|${i.l || "?"}|${i.col}|${i.c}`).join("\n");
+    }
+  }
+  // Fallback: prefer travel-ready items, then full wardrobe
+  const travelItems = wardrobe.filter((i) => i.t === "Yes");
+  const pool = travelItems.length >= 15 ? travelItems : wardrobe;
   return pool.map((i) => `${i.id}|${i.n}|${i.l || "?"}|${i.col}|${i.c}`).join("\n");
 }
 
@@ -99,8 +127,6 @@ const EXAMPLE_OUTPUT = `Output ONLY a JSON object — no markdown, no code block
 /* ────────────────────────────────────────────────────────────────────────────
    countUniqueItems — count distinct item IDs across all outfit slots
    ─────────────────────────────────────────────────────────────────────────── */
-const ALL_OUTFIT_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
-
 export function countUniqueItems(outfitIds) {
   const ids = new Set();
   Object.values(outfitIds).forEach((dayData) => {
@@ -117,31 +143,52 @@ export function countUniqueItems(outfitIds) {
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   generateTripOutfits — full trip generation in 2 sequential batches
+   generateTripOutfits — full trip generation in 2 sequential batches.
+
+   Now uses TripItemPool to restrict generation to approved items only:
+     Pool = capsule items ∪ items in frozen outfit slots
+
    Parameters:
      wardrobe      — full wardrobe array
      frozenDays    — { [dayId]: boolean }
      setOutfitIds  — React state setter from useOutfits
+     outfitIds     — current outfit state (needed to compute tripItemPool)
+     capsuleIds    — Set<itemId> from useCapsule
      onBatchDone   — optional callback after each batch (for progress updates)
    Returns:        number of days generated
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, onBatchDone, capsuleIds }) {
-  const wardrobeText = buildWardrobeText(wardrobe, capsuleIds);
-  const daysToGen = TRIP.filter((d) => !frozenDays[d.id]);
+export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, onBatchDone, capsuleIds, outfitIds }) {
+  // Build Trip Item Pool — restricts AI to approved items only
+  const tripItemPool = buildTripItemPool({
+    wardrobe,
+    capsuleIds,
+    outfitIds: outfitIds || {},
+    frozenDays,
+  });
 
+  const wardrobeText = buildWardrobeText(wardrobe, tripItemPool);
+  // Validate returned IDs against the same pool (falls back to full wardrobe if pool was too small)
+  const validIds = tripItemPool || new Set(wardrobe.map((i) => i.id));
+
+  const daysToGen = TRIP.filter((d) => !frozenDays[d.id]);
   if (daysToGen.length === 0)
     throw new Error("All days are frozen. Unfreeze some days first.");
 
-  const wardrobeIds = new Set(wardrobe.map((i) => i.id));
+  const poolNote = tripItemPool
+    ? `\nIMPORTANT: The catalog above contains ONLY your approved trip items. Use ONLY these IDs.`
+    : "";
 
   const applyParsed = (parsed) => {
     setOutfitIds((prev) => {
       const next = { ...prev };
       Object.entries(parsed).forEach(([dayId, dayData]) => {
         if (frozenDays[dayId]) return;
-        const dt = validateSlot(dayData?.daytime, wardrobeIds);
-        const ev = validateSlot(dayData?.evening, wardrobeIds);
-        if (dt) next[dayId] = { daytime: dt, evening: ev };
+        const dt = validateSlot(dayData?.daytime, validIds);
+        const ev = validateSlot(dayData?.evening, validIds);
+        if (dt) {
+          // Preserve any existing optional slots (breakfast/sleepwear/flight/activity)
+          next[dayId] = { ...(next[dayId] || {}), daytime: dt, evening: ev };
+        }
       });
       return next;
     });
@@ -157,7 +204,7 @@ export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, 
       )
       .join("\n");
 
-    const prompt = `WARDROBE CATALOG (ID|Name|Layer|Color|Category):\n${wardrobeText}\n\nTRIP SCHEDULE:\n${tripText}\n\n${OUTFIT_RULES}\n\nGenerate outfits for ALL days listed above.\n\n${EXAMPLE_OUTPUT}`;
+    const prompt = `WARDROBE CATALOG (ID|Name|Layer|Color|Category):\n${wardrobeText}\n${poolNote}\n\nTRIP SCHEDULE:\n${tripText}\n\n${OUTFIT_RULES}\n\nGenerate outfits for ALL days listed above.\n\n${EXAMPLE_OUTPUT}`;
     const rawText = await callAI({ system: SYSTEM_STYLIST, userContent: prompt, maxTokens: 8000 });
     const parsed = extractJSON(rawText);
     applyParsed(parsed);
@@ -172,12 +219,25 @@ export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, 
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   generateSingleOutfit — one outfit for given occasion / weather / context
+   generateSingleOutfit — one outfit for given occasion / weather / context.
+   Now restricted to TripItemPool when available.
    Returns { base, mid, outer, bottom, shoes } with validated IDs (or null)
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, capsuleIds }) {
-  const wardrobeText = buildWardrobeText(wardrobe, capsuleIds);
-  const wardrobeIds = new Set(wardrobe.map((i) => i.id));
+export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, capsuleIds, outfitIds, frozenDays }) {
+  // Build Trip Item Pool
+  const tripItemPool = buildTripItemPool({
+    wardrobe,
+    capsuleIds,
+    outfitIds: outfitIds || {},
+    frozenDays: frozenDays || {},
+  });
+
+  const wardrobeText = buildWardrobeText(wardrobe, tripItemPool);
+  const validIds = tripItemPool || new Set(wardrobe.map((i) => i.id));
+
+  const poolNote = tripItemPool
+    ? `\nIMPORTANT: Use ONLY the approved trip items listed in the catalog above.`
+    : "";
 
   const contextLines = [
     `Occasion: ${occ}`,
@@ -190,7 +250,7 @@ export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, 
 
   const prompt = `WARDROBE CATALOG (ID|Name|Layer|Color|Category):
 ${wardrobeText}
-
+${poolNote}
 CONTEXT:
 ${contextLines}
 
@@ -206,11 +266,11 @@ Output ONLY a single JSON object (no markdown, no code blocks):
   const rawText = await callAI({ system: SYSTEM_STYLIST, userContent: prompt, maxTokens: 2000 });
   const parsed = extractJSON(rawText);
 
-  // Validate all IDs
+  // Validate all IDs against Trip Item Pool (or full wardrobe as fallback)
   const result = {};
   ["base", "mid", "outer", "bottom", "shoes"].forEach((layer) => {
     const id = parsed[layer];
-    result[layer] = id && wardrobeIds.has(id) ? id : null;
+    result[layer] = id && validIds.has(id) ? id : null;
   });
 
   if (!result.base && !result.bottom && !result.shoes) {
@@ -311,7 +371,7 @@ export async function optimizePackingWithAI({ wardrobe, outfitIds, frozenDays = 
     throw new Error("No planned outfits found to optimize.");
 
   const beforeCount = countUniqueItems(outfitIds);
-  const wardrobeText = buildWardrobeText(wardrobe);
+  const wardrobeText = buildWardrobeText(wardrobe, null);
   const wardrobeIds = new Set(wardrobe.map((i) => i.id));
 
   // Current outfit assignments text — locked days clearly marked

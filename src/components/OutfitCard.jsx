@@ -12,7 +12,7 @@ const LAYER_META = {
 };
 
 /* ─── PREMIUM ITEM THUMB ─────────────────────────────────────────────────── */
-function PremiumItemThumb({ item, onSwap, width = 110, height = 110, alwaysSwap = false }) {
+function PremiumItemThumb({ item, onSwap, width = 110, height = 110, alwaysSwap = false, usageCount = 0 }) {
   const [failed,  setFailed]  = useState(false);
   const [hovered, setHovered] = useState(false);
 
@@ -212,6 +212,20 @@ function PremiumItemThumb({ item, onSwap, width = 110, height = 110, alwaysSwap 
             {brand.toUpperCase()}
           </p>
         )}
+        {/* ── usage badge: shown when item appears 2+ times across all outfit slots ── */}
+        {!missing && usageCount >= 2 && (
+          <p
+            style={{
+              fontSize: Math.max(7, width * 0.056),
+              fontWeight: 700,
+              color: "#93C5FD",
+              marginTop: 2,
+              letterSpacing: 0.8,
+            }}
+          >
+            ×{usageCount} used
+          </p>
+        )}
       </div>
     </div>
   );
@@ -241,9 +255,10 @@ function LayerBadge({ layer }) {
   );
 }
 
-/* ─── SLOT (badge + thumb + optional empty state) ────────────────────────── */
-function Slot({ layer, item, onSwap, width, height, alwaysSwap = false }) {
+/* ─── SLOT (layer badge + thumb) ─────────────────────────────────────────── */
+function Slot({ layer, item, onSwap, width, height, alwaysSwap = false, usageStats }) {
   if (!item) return null;
+  const usageCount = (!item._missing && usageStats?.[item.id]?.count) || 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
       <LayerBadge layer={layer} />
@@ -253,13 +268,14 @@ function Slot({ layer, item, onSwap, width, height, alwaysSwap = false }) {
         width={width}
         height={height}
         alwaysSwap={alwaysSwap || item._missing}
+        usageCount={usageCount}
       />
     </div>
   );
 }
 
 /* ─── EXPAND MODAL ───────────────────────────────────────────────────────── */
-function OutfitExpandModal({ outfit, onSwap, onRegenerate, onClose }) {
+function OutfitExpandModal({ outfit, onSwap, onRegenerate, onClose, usageStats }) {
   const { base, mid, outer, thermalBottom, bottom, shoes } = outfit;
 
   // Close on Escape
@@ -349,24 +365,24 @@ function OutfitExpandModal({ outfit, onSwap, onRegenerate, onClose }) {
         {/* Hero: BASE */}
         {base && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "22px 20px 0" }}>
-            <Slot layer="base" item={base} onSwap={() => handleSwap("base")} width={200} height={220} alwaysSwap />
+            <Slot layer="base" item={base} onSwap={() => handleSwap("base")} width={200} height={220} alwaysSwap usageStats={usageStats} />
           </div>
         )}
 
         {/* Mid row: MID + OUTER */}
         {(mid || outer) && (
           <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "16px 20px 0" }}>
-            {mid   && <Slot layer="mid"   item={mid}   onSwap={() => handleSwap("mid")}   width={130} height={130} alwaysSwap />}
-            {outer && <Slot layer="outer" item={outer} onSwap={() => handleSwap("outer")} width={130} height={130} alwaysSwap />}
+            {mid   && <Slot layer="mid"   item={mid}   onSwap={() => handleSwap("mid")}   width={130} height={130} alwaysSwap usageStats={usageStats} />}
+            {outer && <Slot layer="outer" item={outer} onSwap={() => handleSwap("outer")} width={130} height={130} alwaysSwap usageStats={usageStats} />}
           </div>
         )}
 
         {/* Lower row: THERMAL BOTTOM + BOTTOM + SHOES */}
         {(thermalBottom || bottom || shoes) && (
           <div style={{ display: "flex", justifyContent: "center", gap: 16, padding: "16px 20px 0", flexWrap: "wrap" }}>
-            {thermalBottom && <Slot layer="thermalBottom" item={thermalBottom} onSwap={() => handleSwap("thermalBottom")} width={120} height={120} alwaysSwap />}
-            {bottom        && <Slot layer="bottom"        item={bottom}        onSwap={() => handleSwap("bottom")}        width={140} height={140} alwaysSwap />}
-            {shoes         && <Slot layer="shoes"         item={shoes}         onSwap={() => handleSwap("shoes")}         width={140} height={140} alwaysSwap />}
+            {thermalBottom && <Slot layer="thermalBottom" item={thermalBottom} onSwap={() => handleSwap("thermalBottom")} width={120} height={120} alwaysSwap usageStats={usageStats} />}
+            {bottom        && <Slot layer="bottom"        item={bottom}        onSwap={() => handleSwap("bottom")}        width={140} height={140} alwaysSwap usageStats={usageStats} />}
+            {shoes         && <Slot layer="shoes"         item={shoes}         onSwap={() => handleSwap("shoes")}         width={140} height={140} alwaysSwap usageStats={usageStats} />}
           </div>
         )}
 
@@ -415,12 +431,13 @@ function OutfitExpandModal({ outfit, onSwap, onRegenerate, onClose }) {
 }
 
 /* ─── OUTFIT CARD (main export) ──────────────────────────────────────────── */
-// Props (unchanged public API):
+// Props:
 //   outfit:       { base, mid, outer, thermalBottom, bottom, shoes } — full item objects or null
 //   onSwap(layer): callback to swap an item in that layer
 //   onRegenerate:  callback to regenerate the full outfit
 //   loading:       boolean
-export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
+//   usageStats:    { [itemId]: { count, inFrozen, inAny, inRecent } } — from computeUsageStats
+export default function OutfitCard({ outfit, onSwap, onRegenerate, loading, usageStats }) {
   const [expanded, setExpanded] = useState(false);
 
   /* ── loading state ── */
@@ -502,6 +519,7 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
               onSwap={onSwap ? () => onSwap("base") : null}
               width={160}
               height={180}
+              usageStats={usageStats}
             />
           )}
 
@@ -515,6 +533,7 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
                   onSwap={onSwap ? () => onSwap("outer") : null}
                   width={90}
                   height={90}
+                  usageStats={usageStats}
                 />
               )}
               {mid && (
@@ -524,6 +543,7 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
                   onSwap={onSwap ? () => onSwap("mid") : null}
                   width={90}
                   height={90}
+                  usageStats={usageStats}
                 />
               )}
             </div>
@@ -545,6 +565,7 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
                 onSwap={onSwap ? () => onSwap("thermalBottom") : null}
                 width={100}
                 height={100}
+                usageStats={usageStats}
               />
             )}
             {bottom && (
@@ -554,6 +575,7 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
                 onSwap={onSwap ? () => onSwap("bottom") : null}
                 width={120}
                 height={120}
+                usageStats={usageStats}
               />
             )}
             {shoes && (
@@ -563,6 +585,7 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
                 onSwap={onSwap ? () => onSwap("shoes") : null}
                 width={120}
                 height={120}
+                usageStats={usageStats}
               />
             )}
           </div>
@@ -626,6 +649,7 @@ export default function OutfitCard({ outfit, onSwap, onRegenerate, loading }) {
           onSwap={onSwap}
           onRegenerate={onRegenerate}
           onClose={() => setExpanded(false)}
+          usageStats={usageStats}
         />
       )}
     </>

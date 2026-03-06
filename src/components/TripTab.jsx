@@ -45,6 +45,7 @@ export default function TripTab({
   setOutfitIds,
   frozenDays = {},
   onNavigateToDay,
+  capsuleIds,
 }) {
   const [aiLoading, setAiLoading] = useState(false);
   const [aiDone,    setAiDone]    = useState(false);
@@ -60,7 +61,7 @@ export default function TripTab({
     setAiError(null);
     setAiDone(false);
     try {
-      await generateTripOutfits({ wardrobe, frozenDays, setOutfitIds });
+      await generateTripOutfits({ wardrobe, frozenDays, outfitIds, setOutfitIds, capsuleIds });
       setAiDone(true);
       setTimeout(() => setAiDone(false), 3000);
     } catch (err) {
