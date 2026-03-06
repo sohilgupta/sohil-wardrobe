@@ -253,7 +253,20 @@ export default function WardrobeTab({
                   <ItemVisual item={detail} size={110} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 6, marginBottom: 4 }}>
-                      <p style={{ fontSize: 16, fontWeight: 700, color: T.text, lineHeight: 1.3, flex: 1 }}>{detail.n || detail.itemName}</p>
+                      {detail.productUrl ? (
+                        <a
+                          href={detail.productUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          title="View product page"
+                          style={{ fontSize: 16, fontWeight: 700, color: T.text, lineHeight: 1.3, flex: 1, textDecoration: "none" }}
+                        >
+                          {detail.n || detail.itemName}
+                        </a>
+                      ) : (
+                        <p style={{ fontSize: 16, fontWeight: 700, color: T.text, lineHeight: 1.3, flex: 1 }}>{detail.n || detail.itemName}</p>
+                      )}
                       {detail.productUrl && (
                         <a
                           href={detail.productUrl}

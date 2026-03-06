@@ -109,10 +109,15 @@ const fromBackend = (data) => {
       updatedAt[dayId]  = val.updatedAt || "0";
     }
     // New format: { daytime: {...}|null, evening: {...}|null, isFrozen, updatedAt }
+    // Also supports new optional slots: breakfast, sleepwear, flight, activity
     else {
       outfitIds[dayId] = {
-        daytime: val.daytime || null,
-        evening: val.evening || null,
+        daytime:   val.daytime   || null,
+        evening:   val.evening   || null,
+        breakfast: val.breakfast || null,
+        sleepwear: val.sleepwear || null,
+        flight:    val.flight    || null,
+        activity:  val.activity  || null,
       };
       frozenDays[dayId] = val.isFrozen  || false;
       updatedAt[dayId]  = val.updatedAt || "0";
@@ -127,8 +132,12 @@ const toBackend = (outfitIds, frozenDays, updatedAt) => {
   const allDays = new Set([...Object.keys(outfitIds), ...Object.keys(frozenDays)]);
   allDays.forEach((dayId) => {
     result[dayId] = {
-      daytime:   outfitIds[dayId]?.daytime || null,
-      evening:   outfitIds[dayId]?.evening || null,
+      daytime:   outfitIds[dayId]?.daytime   || null,
+      evening:   outfitIds[dayId]?.evening   || null,
+      breakfast: outfitIds[dayId]?.breakfast || null,
+      sleepwear: outfitIds[dayId]?.sleepwear || null,
+      flight:    outfitIds[dayId]?.flight    || null,
+      activity:  outfitIds[dayId]?.activity  || null,
       isFrozen:  frozenDays[dayId] || false,
       updatedAt: updatedAt[dayId]  || new Date().toISOString(),
     };

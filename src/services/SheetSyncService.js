@@ -174,12 +174,18 @@ function normalizeTab(tabName, gvizData) {
     notes:        findColByLabel(cols, "notes", "note"),
     size:         findColByLabel(cols, "size"),
     price:        findColByLabel(cols, "price"),
-    productUrl:   findColByLabel(cols, "product url", "product link", "link", "url", "shop url"),
+    productUrl:   findColByLabel(cols, "product url", "product link", "shop link", "shop url", "buy link"),
     purchaseDate: findColByLabel(cols, "purchase date", "purchased", "date purchased", "bought on", "purchase"),
   };
 
   // Prefer "image url" column; fall back to "image" column
   const imgColIdx = colIdx.imageUrl !== -1 ? colIdx.imageUrl : colIdx.image;
+
+  // Safety: if productUrl detection accidentally matched the image column, discard it.
+  // e.g. a column labelled "Image URL" would match the generic "url" candidate.
+  if (colIdx.productUrl !== -1 && colIdx.productUrl === imgColIdx) {
+    colIdx.productUrl = -1;
+  }
 
   const layer   = layerFromTab(tabName);
   const occ     = occFromTab(tabName);

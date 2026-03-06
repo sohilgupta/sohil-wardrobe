@@ -59,6 +59,8 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
   }
 
   /* ── Build packing list — frozen-day outfit items + capsule items ── */
+  const ALL_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
+
   const { groups, capsuleOnlyGroups, totalItems, capsuleOnlyCount, frozenCount, totalDays } = useMemo(() => {
     const usage = {}; // itemId → how many outfit slots it appears in
     let frozenWithOutfits = 0;
@@ -80,9 +82,11 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
         return hasReal;
       };
 
-      const dtHas = collectSlot(dayData.daytime);
-      const evHas = collectSlot(dayData.evening);
-      if (dtHas || evHas) frozenWithOutfits++;
+      let hasAny = false;
+      ALL_SLOTS.forEach((slot) => {
+        if (collectSlot(dayData[slot])) hasAny = true;
+      });
+      if (hasAny) frozenWithOutfits++;
     });
 
     // Resolve item IDs to full item objects + attach usage count

@@ -285,6 +285,8 @@ function AuthenticatedApp({ onLogout }) {
             toggleCapsule={toggleCapsule}
             setManyCapsule={setManyCapsule}
             clearCapsule={clearCapsule}
+            outfitIds={outfitIds}
+            frozenDays={frozenDays}
           />
         )}
         {tab === "trip"    && <TripTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} onNavigateToDay={navigateToDay} />}

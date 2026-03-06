@@ -1,4 +1,4 @@
-/* ─── OUTFITS TAB — Outfit per Day (Daytime + Evening) ───────────────────────
+/* ─── OUTFITS TAB — Outfit per Day (Daytime + Evening + Optional Occasions) ──
    Data:       wardrobe prop (from useWardrobe hook — single source of truth).
    outfitIds:  from useOutfits hook in App.jsx — persisted to localStorage + backend.
    frozenDays: { [dayId]: boolean } — frozen days cannot be overwritten by AI gen or local regen.
@@ -6,21 +6,37 @@
 
    Outfit per day schema:
    {
-     daytime: { base, mid?, outer?, bottom, thermalBottom?, shoes } | null,
-     evening: { base, mid?, outer?, bottom, thermalBottom?, shoes } | null,
+     daytime:   { base, mid?, outer?, bottom, thermalBottom?, shoes } | null,
+     evening:   { base, mid?, outer?, bottom, thermalBottom?, shoes } | null,
+     breakfast: { base, mid?, bottom, shoes } | null,   // null = slot disabled
+     sleepwear: { base, bottom } | null,                // null = slot disabled
+     flight:    { base, mid?, outer?, bottom, shoes } | null,
+     activity:  { base, mid?, bottom, shoes } | null,
    }
 
-   "REMOVED" sentinel: user explicitly removed optional mid/outer/thermalBottom layer.
+   "REMOVED" sentinel: user explicitly removed an optional layer.
+   null = slot disabled (optional slots). {} = slot enabled, outfit not yet generated.
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useEffect, useCallback } from "react";
 import { T } from "../theme";
 import TRIP from "../data/trip";
-// generateOutfit (local engine) removed — regen now uses Gemini via generateSingleOutfit
 import { generateTripOutfits, generateSingleOutfit } from "../utils/tripGenerator";
 import OutfitCard from "./OutfitCard";
 import ItemPicker from "./ItemPicker";
 import Chip from "./Chip";
+
+/* ─── Slot configs ────────────────────────────────────────────────────────── */
+const SLOT_CONFIGS = {
+  daytime:   { icon: "☀️",  label: "DAYTIME",            optionalLayers: ["mid", "outer", "thermalBottom"], isOptional: false },
+  evening:   { icon: "🌙",  label: "EVENING",            optionalLayers: ["mid", "outer", "thermalBottom"], isOptional: false },
+  breakfast: { icon: "☕",  label: "BREAKFAST / LOUNGE", optionalLayers: ["mid"],                           isOptional: true },
+  sleepwear: { icon: "😴",  label: "SLEEPWEAR",          optionalLayers: [],                                isOptional: true },
+  flight:    { icon: "✈️",  label: "FLIGHT",             optionalLayers: ["mid", "outer"],                  isOptional: true },
+  activity:  { icon: "🏃",  label: "ACTIVITY",           optionalLayers: ["mid"],                           isOptional: true },
+};
+const OPTIONAL_SLOT_IDS = ["breakfast", "sleepwear", "flight", "activity"];
+const ALL_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
 
 /* ─── Responsive hook ────────────────────────────────────────────────────── */
 function useIsMobile(bp = 640) {
@@ -157,21 +173,24 @@ function LayerBtn({ active, label, onAdd, onRemove }) {
   );
 }
 
-/* ─── Slot Section (renders one daytime or evening outfit slot) ───────────── */
+/* ─── Slot Section (renders one outfit occasion slot) ────────────────────── */
 function SlotSection({
   slot, icon, label, activity,
+  optionalLayers,   // string[] — which optional layers to show (e.g. ["mid","outer","thermalBottom"])
+  onDisable,        // () => void | null — if set, shows ✕ remove button (optional slots only)
   slotIds, slotOutfit,
   isFrozen, isLoading,
   onPick, onRegenerate, onRemoveLayer, onAddLayer,
 }) {
-  const midActive           = !!(slotIds?.mid           && slotIds.mid           !== "REMOVED");
-  const outerActive         = !!(slotIds?.outer         && slotIds.outer         !== "REMOVED");
-  const thermalBottomActive = !!(slotIds?.thermalBottom && slotIds.thermalBottom !== "REMOVED");
-  const hasOutfit   = slotIds && Object.values(slotIds).some((v) => v && v !== "REMOVED");
+  const midActive           = optionalLayers.includes("mid")           && !!(slotIds?.mid           && slotIds.mid           !== "REMOVED");
+  const outerActive         = optionalLayers.includes("outer")         && !!(slotIds?.outer         && slotIds.outer         !== "REMOVED");
+  const thermalBottomActive = optionalLayers.includes("thermalBottom") && !!(slotIds?.thermalBottom && slotIds.thermalBottom !== "REMOVED");
+  const hasOutfit           = !!(slotIds && Object.values(slotIds).some((v) => v && v !== "REMOVED"));
+  const hasAnyOptLayers     = optionalLayers.length > 0;
 
   return (
     <div>
-      {/* Slot label */}
+      {/* Slot label row */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
         marginBottom: 10,
@@ -183,29 +202,46 @@ function SlotSection({
             <span style={{ fontSize: 10, color: T.mid }}>· {activity}</span>
           )}
         </div>
-        {/* Per-slot local regenerate button */}
-        {!isFrozen && hasOutfit && !isLoading && (
-          <button
-            onClick={onRegenerate}
-            title={`Regenerate ${label.toLowerCase()} outfit`}
-            style={{
-              background: "none", border: `1px solid ${T.borderLight}`,
-              borderRadius: 20, padding: "2px 9px",
-              fontSize: 10, color: T.light, cursor: "pointer",
-              fontFamily: "inherit", letterSpacing: 0.5,
-              display: "flex", alignItems: "center", gap: 4,
-              transition: "all 0.15s",
-            }}
-          >
-            ↺ <span style={{ fontSize: 9 }}>REGEN</span>
-          </button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Per-slot local regenerate button */}
+          {!isFrozen && hasOutfit && !isLoading && (
+            <button
+              onClick={onRegenerate}
+              title={`Regenerate ${label.toLowerCase()} outfit`}
+              style={{
+                background: "none", border: `1px solid ${T.borderLight}`,
+                borderRadius: 20, padding: "2px 9px",
+                fontSize: 10, color: T.light, cursor: "pointer",
+                fontFamily: "inherit", letterSpacing: 0.5,
+                display: "flex", alignItems: "center", gap: 4,
+                transition: "all 0.15s",
+              }}
+            >
+              ↺ <span style={{ fontSize: 9 }}>REGEN</span>
+            </button>
+          )}
+          {/* Remove optional slot button */}
+          {onDisable && !isFrozen && (
+            <button
+              onClick={onDisable}
+              title="Remove this occasion"
+              style={{
+                background: "none", border: "none",
+                padding: "2px 5px", borderRadius: 6,
+                fontSize: 12, color: T.light, cursor: "pointer",
+                fontFamily: "inherit", lineHeight: 1,
+                opacity: 0.6, transition: "opacity 0.15s",
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Empty slot */}
       {!hasOutfit && !isLoading && (
         isFrozen ? (
-          /* Frozen + empty: hint to unfreeze */
           <div style={{
             width: "100%", padding: "12px", borderRadius: 12,
             border: `1.5px dashed #374151`,
@@ -216,7 +252,6 @@ function SlotSection({
             🔒 Unfreeze to add {label.toLowerCase()} outfit
           </div>
         ) : (
-          /* Not frozen: generate button */
           <button
             onClick={onRegenerate}
             style={{
@@ -243,15 +278,21 @@ function SlotSection({
         />
       )}
 
-      {/* Layer controls */}
-      {slotIds && !isLoading && !isFrozen && (
+      {/* Layer controls (only when outfit exists and layers are applicable) */}
+      {slotIds && hasOutfit && !isLoading && !isFrozen && hasAnyOptLayers && (
         <div style={{ marginTop: 10, display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light, marginRight: 2 }}>
             LAYERS
           </span>
-          <LayerBtn active={midActive}           label="Mid"            onAdd={() => onAddLayer("mid")}           onRemove={() => onRemoveLayer("mid")} />
-          <LayerBtn active={outerActive}         label="Outer"          onAdd={() => onAddLayer("outer")}         onRemove={() => onRemoveLayer("outer")} />
-          <LayerBtn active={thermalBottomActive} label="Therm. Bottom"  onAdd={() => onAddLayer("thermalBottom")} onRemove={() => onRemoveLayer("thermalBottom")} />
+          {optionalLayers.includes("mid") && (
+            <LayerBtn active={midActive}           label="Mid"           onAdd={() => onAddLayer("mid")}           onRemove={() => onRemoveLayer("mid")} />
+          )}
+          {optionalLayers.includes("outer") && (
+            <LayerBtn active={outerActive}         label="Outer"         onAdd={() => onAddLayer("outer")}         onRemove={() => onRemoveLayer("outer")} />
+          )}
+          {optionalLayers.includes("thermalBottom") && (
+            <LayerBtn active={thermalBottomActive} label="Therm. Bottom" onAdd={() => onAddLayer("thermalBottom")} onRemove={() => onRemoveLayer("thermalBottom")} />
+          )}
         </div>
       )}
     </div>
@@ -276,7 +317,7 @@ export default function OutfitsTab({
   const [aiDone,      setAiDone]      = useState(false);
   // { dayId, slot } pair showing local regen spinner
   const [slotLoading, setSlotLoading] = useState(null);
-  // { slot: "daytime"|"evening", layer: "base"|"mid"|"outer"|"bottom"|"shoes" } | null
+  // { slot, layer } | null — picker target
   const [pickerLayer, setPickerLayer] = useState(null);
 
   const isMobile = useIsMobile();
@@ -292,12 +333,12 @@ export default function OutfitsTab({
   /* ── Derived freeze state for selected day ── */
   const isCurrentFrozen = frozenDays[selectedDay?.id] || false;
 
-  /* ── Does a day have any real outfit data? ── */
+  /* ── Does a day have any real outfit data (any slot)? ── */
   const isPlannedDay = (dayId) => {
     const data = outfitIds[dayId];
     if (!data) return false;
     const hasReal = (ids) => ids && Object.values(ids).some((v) => v && v !== "REMOVED");
-    return hasReal(data.daytime) || hasReal(data.evening);
+    return ALL_SLOTS.some((slot) => hasReal(data[slot]));
   };
 
   /* ── Does a day reference any item not in wardrobe? ── */
@@ -307,17 +348,23 @@ export default function OutfitsTab({
     const check = (ids) => ids && Object.values(ids).some(
       (id) => id && id !== "REMOVED" && !wardrobe.find((i) => i.id === id)
     );
-    return check(data.daytime) || check(data.evening);
+    return ALL_SLOTS.some((slot) => check(data[slot]));
   };
 
   /* ── Current day derived data ── */
   const currentDayData = selectedDay ? (outfitIds[selectedDay.id] || null) : null;
-  const dtIds = currentDayData?.daytime || null;
-  const evIds = currentDayData?.evening || null;
+  const dtIds      = currentDayData?.daytime  || null;
+  const evIds      = currentDayData?.evening  || null;
   const daytimeOutfit = dtIds ? resolveOutfit(dtIds, wardrobe) : null;
   const eveningOutfit = evIds ? resolveOutfit(evIds, wardrobe) : null;
 
-  /* ── AI: Generate Outfits for All Non-Frozen Days (via shared utility) ── */
+  /* ── Optional slots that are currently disabled for selected day ── */
+  const disabledOptionalSlots = OPTIONAL_SLOT_IDS.filter((s) => {
+    const v = currentDayData?.[s];
+    return v === null || v === undefined;
+  });
+
+  /* ── AI: Generate Outfits for All Non-Frozen Days ── */
   async function generateAll() {
     if (aiLoading || wardrobe.length === 0) return;
     setAiLoading(true);
@@ -334,10 +381,9 @@ export default function OutfitsTab({
     }
   }
 
-  /* ── Regen one slot via Gemini ── */
+  /* ── Regen one slot via AI ── */
   const regenSlot = useCallback(async (slot) => {
     if (!selectedDay || isCurrentFrozen || wardrobe.length === 0) return;
-
     setSlotLoading({ dayId: selectedDay.id, slot });
 
     // Preserve REMOVED sentinels from existing slot
@@ -346,18 +392,32 @@ export default function OutfitsTab({
     const outerRemoved         = prevSlotIds.outer         === "REMOVED";
     const thermalBottomRemoved = prevSlotIds.thermalBottom === "REMOVED";
 
-    // For evening, use the evening occasion derived from the night field
-    const effectiveDay = slot === "evening"
-      ? { ...selectedDay, occ: eveningOcc(selectedDay.night) }
-      : selectedDay;
+    // Derive occasion + activity description per slot type
+    const slotOcc = {
+      daytime:   selectedDay.occ,
+      evening:   eveningOcc(selectedDay.night),
+      breakfast: "Casual",
+      sleepwear: "Sleepwear",
+      flight:    "Flight",
+      activity:  "Active",
+    }[slot] ?? selectedDay.occ;
+
+    const slotAct = {
+      daytime:   selectedDay.day,
+      evening:   selectedDay.night,
+      breakfast: "Breakfast / hotel lounge",
+      sleepwear: "Sleepwear",
+      flight:    "Flight day",
+      activity:  "Activity / gym / excursion",
+    }[slot] ?? selectedDay.day;
 
     try {
       const ids = await generateSingleOutfit({
         wardrobe,
-        occ:     effectiveDay.occ,
-        weather: effectiveDay.w,
-        city:    effectiveDay.city,
-        act:     slot === "daytime" ? effectiveDay.day : effectiveDay.night,
+        occ:     slotOcc,
+        weather: selectedDay.w,
+        city:    selectedDay.city,
+        act:     slotAct,
         capsuleIds,
       });
 
@@ -367,11 +427,8 @@ export default function OutfitsTab({
       if (thermalBottomRemoved) ids.thermalBottom = "REMOVED";
 
       setOutfitIds((prev) => {
-        const dayData = prev[selectedDay.id] || { daytime: null, evening: null };
-        return {
-          ...prev,
-          [selectedDay.id]: { ...dayData, [slot]: ids },
-        };
+        const dayData = prev[selectedDay.id] || {};
+        return { ...prev, [selectedDay.id]: { ...dayData, [slot]: ids } };
       });
     } catch (err) {
       setAiError(err.message || "Regen failed. Try again.");
@@ -379,7 +436,27 @@ export default function OutfitsTab({
     } finally {
       setSlotLoading(null);
     }
-  }, [selectedDay, isCurrentFrozen, wardrobe, outfitIds, setOutfitIds]);
+  }, [selectedDay, isCurrentFrozen, wardrobe, outfitIds, setOutfitIds, capsuleIds]);
+
+  /* ── Enable an optional slot (set to {} → shows "Generate" button) ── */
+  const enableSlot = useCallback((slot) => {
+    if (!selectedDay || isCurrentFrozen) return;
+    setOutfitIds((prev) => {
+      const dayData = prev[selectedDay.id] || {};
+      return { ...prev, [selectedDay.id]: { ...dayData, [slot]: {} } };
+    });
+    // Immediately trigger AI generation for the new slot
+    regenSlot(slot);
+  }, [selectedDay, isCurrentFrozen, setOutfitIds, regenSlot]);
+
+  /* ── Disable an optional slot (set to null) ── */
+  const disableSlot = useCallback((slot) => {
+    if (!selectedDay || isCurrentFrozen) return;
+    setOutfitIds((prev) => {
+      const dayData = prev[selectedDay.id] || {};
+      return { ...prev, [selectedDay.id]: { ...dayData, [slot]: null } };
+    });
+  }, [selectedDay, isCurrentFrozen, setOutfitIds]);
 
   /* ── Open ItemPicker for manual slot+layer selection ── */
   function handlePick(slot, layer) {
@@ -397,14 +474,11 @@ export default function OutfitsTab({
   function handleRemoveLayer(slot, layer) {
     if (!selectedDay || isCurrentFrozen) return;
     setOutfitIds((prev) => {
-      const dayData  = prev[selectedDay.id] || { daytime: null, evening: null };
+      const dayData  = prev[selectedDay.id] || {};
       const slotData = dayData[slot] || {};
       return {
         ...prev,
-        [selectedDay.id]: {
-          ...dayData,
-          [slot]: { ...slotData, [layer]: "REMOVED" },
-        },
+        [selectedDay.id]: { ...dayData, [slot]: { ...slotData, [layer]: "REMOVED" } },
       };
     });
   }
@@ -414,14 +488,11 @@ export default function OutfitsTab({
     if (!selectedDay || !pickerLayer || isCurrentFrozen) return;
     const { slot, layer } = pickerLayer;
     setOutfitIds((prev) => {
-      const dayData  = prev[selectedDay.id] || { daytime: null, evening: null };
+      const dayData  = prev[selectedDay.id] || {};
       const slotData = dayData[slot] || {};
       return {
         ...prev,
-        [selectedDay.id]: {
-          ...dayData,
-          [slot]: { ...slotData, [layer]: item.id },
-        },
+        [selectedDay.id]: { ...dayData, [slot]: { ...slotData, [layer]: item.id } },
       };
     });
     setPickerLayer(null);
@@ -438,6 +509,7 @@ export default function OutfitsTab({
   /* ── Slot loading helpers ── */
   const isDtLoading = !!(slotLoading?.dayId === selectedDay?.id && slotLoading?.slot === "daytime");
   const isEvLoading = !!(slotLoading?.dayId === selectedDay?.id && slotLoading?.slot === "evening");
+  const isOptSlotLoading = (slot) => !!(slotLoading?.dayId === selectedDay?.id && slotLoading?.slot === slot);
 
   /* ── Stats ── */
   const plannedCount = TRIP.filter((d) => isPlannedDay(d.id)).length;
@@ -562,14 +634,12 @@ export default function OutfitsTab({
             ))}
           </div>
         ) : (
-          /* DESKTOP: vertical sidebar — sticky so it stays in view while scrolling */
+          /* DESKTOP: vertical sidebar */
           <div style={{
             width: 160, flexShrink: 0,
             background: T.surface,
             border: `1.5px solid ${T.borderLight}`,
             borderRadius: 16, overflow: "hidden",
-            // Sticky + height capped to viewport minus the fixed header (~90px)
-            // This keeps the sidebar full-size even at high browser zoom levels
             position: "sticky",
             top: 90,
             alignSelf: "flex-start",
@@ -674,9 +744,11 @@ export default function OutfitsTab({
                 {/* ── Daytime slot ── */}
                 <SlotSection
                   slot="daytime"
-                  icon="☀️"
-                  label="DAYTIME"
+                  icon={SLOT_CONFIGS.daytime.icon}
+                  label={SLOT_CONFIGS.daytime.label}
                   activity={selectedDay.day}
+                  optionalLayers={SLOT_CONFIGS.daytime.optionalLayers}
+                  onDisable={null}
                   slotIds={dtIds}
                   slotOutfit={daytimeOutfit}
                   isFrozen={isCurrentFrozen}
@@ -693,9 +765,11 @@ export default function OutfitsTab({
                 {/* ── Evening slot ── */}
                 <SlotSection
                   slot="evening"
-                  icon="🌙"
-                  label="EVENING"
+                  icon={SLOT_CONFIGS.evening.icon}
+                  label={SLOT_CONFIGS.evening.label}
                   activity={selectedDay.night}
+                  optionalLayers={SLOT_CONFIGS.evening.optionalLayers}
+                  onDisable={null}
                   slotIds={evIds}
                   slotOutfit={eveningOutfit}
                   isFrozen={isCurrentFrozen}
@@ -705,6 +779,67 @@ export default function OutfitsTab({
                   onRemoveLayer={(layer) => handleRemoveLayer("evening", layer)}
                   onAddLayer={(layer) => handleAddLayer("evening", layer)}
                 />
+
+                {/* ── Optional occasion slots ── */}
+                {OPTIONAL_SLOT_IDS.map((slot) => {
+                  const slotRawData = currentDayData?.[slot];
+                  // null or undefined = disabled; don't render
+                  if (slotRawData === null || slotRawData === undefined) return null;
+                  const cfg = SLOT_CONFIGS[slot];
+                  return (
+                    <div key={slot}>
+                      <div style={{ height: 1, background: T.borderLight, margin: "18px 0" }} />
+                      <SlotSection
+                        slot={slot}
+                        icon={cfg.icon}
+                        label={cfg.label}
+                        activity={null}
+                        optionalLayers={cfg.optionalLayers}
+                        onDisable={() => disableSlot(slot)}
+                        slotIds={slotRawData}
+                        slotOutfit={resolveOutfit(slotRawData, wardrobe)}
+                        isFrozen={isCurrentFrozen}
+                        isLoading={isOptSlotLoading(slot)}
+                        onPick={(layer) => handlePick(slot, layer)}
+                        onRegenerate={() => regenSlot(slot)}
+                        onRemoveLayer={(layer) => handleRemoveLayer(slot, layer)}
+                        onAddLayer={(layer) => handleAddLayer(slot, layer)}
+                      />
+                    </div>
+                  );
+                })}
+
+                {/* ── Add Occasion buttons ── */}
+                {!isCurrentFrozen && disabledOptionalSlots.length > 0 && (
+                  <div>
+                    <div style={{ height: 1, background: T.borderLight, margin: "18px 0 14px" }} />
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, color: T.light }}>
+                        ADD OCCASION
+                      </span>
+                      {disabledOptionalSlots.map((slot) => {
+                        const cfg = SLOT_CONFIGS[slot];
+                        return (
+                          <button
+                            key={slot}
+                            onClick={() => enableSlot(slot)}
+                            style={{
+                              padding: "4px 10px", borderRadius: 20,
+                              border: `1.5px dashed ${T.borderLight}`,
+                              background: "none", color: T.mid,
+                              fontSize: 9, fontWeight: 600, letterSpacing: 0.5,
+                              cursor: "pointer", fontFamily: "inherit",
+                              display: "flex", alignItems: "center", gap: 4,
+                              transition: "all 0.15s",
+                            }}
+                          >
+                            {cfg.icon} {cfg.label.toLowerCase()}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Missing item warning */}
                 {hasMissing(selectedDay.id) && (
@@ -717,7 +852,7 @@ export default function OutfitsTab({
                     ⚠️ Some items were removed from the wardrobe.
                     {isCurrentFrozen
                       ? " Unfreeze to pick replacements."
-                      : " Tap ⟳ on the slot to pick a replacement."
+                      : " Tap ↺ on the slot to pick a replacement."
                     }
                   </div>
                 )}

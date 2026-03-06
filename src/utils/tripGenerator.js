@@ -99,11 +99,13 @@ const EXAMPLE_OUTPUT = `Output ONLY a JSON object — no markdown, no code block
 /* ────────────────────────────────────────────────────────────────────────────
    countUniqueItems — count distinct item IDs across all outfit slots
    ─────────────────────────────────────────────────────────────────────────── */
+const ALL_OUTFIT_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
+
 export function countUniqueItems(outfitIds) {
   const ids = new Set();
   Object.values(outfitIds).forEach((dayData) => {
     if (!dayData) return;
-    ["daytime", "evening"].forEach((slot) => {
+    ALL_OUTFIT_SLOTS.forEach((slot) => {
       const slotIds = dayData[slot];
       if (!slotIds) return;
       Object.values(slotIds).forEach((id) => {
@@ -218,11 +220,17 @@ Output ONLY a single JSON object (no markdown, no code blocks):
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   generateCapsuleWithAI — selects ~25–35 versatile items for the trip capsule.
+   generateCapsuleWithAI — selects ~20–35 versatile items for the trip capsule.
    Takes the full wardrobe (so the AI can consider all options) and returns an
    array of item IDs chosen for maximum versatility, layering, and efficiency.
+
+   Parameters:
+     wardrobe      — full wardrobe array
+     frozenItemIds — Set<itemId> of items already in frozen outfits (protected)
+   These frozen-outfit items are ALWAYS included in the result; the AI is asked
+   to suggest additional items and remove unnecessary duplicates around them.
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateCapsuleWithAI({ wardrobe }) {
+export async function generateCapsuleWithAI({ wardrobe, frozenItemIds = new Set() }) {
   if (wardrobe.length === 0) throw new Error("Wardrobe is empty.");
 
   // Build a richer per-item description including weather tag
@@ -235,26 +243,41 @@ export async function generateCapsuleWithAI({ wardrobe }) {
     .map((d) => `${d.date}: ${d.city}, Weather: ${d.w}, Day: ${d.day || d.occ}, Evening: ${d.night || "Casual"}`)
     .join("\n");
 
+  // List frozen items that must be preserved
+  const frozenList = wardrobe
+    .filter((i) => frozenItemIds.has(i.id))
+    .map((i) => `${i.id}|${i.n}|${i.l || "?"}`)
+    .join("\n");
+
   const SYSTEM_CAPSULE =
     "You are an expert travel packing consultant. Output ONLY valid JSON with no markdown, code blocks, or explanation. Never invent item IDs — use only exact IDs from the provided catalog.";
+
+  const frozenSection = frozenItemIds.size > 0
+    ? `\nPROTECTED ITEMS (already in frozen outfits — MUST be included in capsuleIds):\n${frozenList}\n`
+    : "";
+
+  const targetRange = frozenItemIds.size > 0
+    ? "Aim for 20–35 total items (including all protected items above)."
+    : "Select 25–35 versatile items.";
 
   const prompt = `FULL WARDROBE (ID|Name|Layer|Color|Category|Weather):
 ${allItemsText}
 
 TRIP SCHEDULE:
 ${tripSummary}
-
-TASK: Select 25–35 versatile items that form a complete travel capsule for this specific trip.
+${frozenSection}
+TASK: ${targetRange} Form a complete travel capsule for this specific trip.
 
 SELECTION RULES:
-1. Cover all weather conditions present in the trip schedule
-2. Include items for all activity types (hiking, dinner, casual, flights, shows)
-3. Ensure layering coverage: at least 3 base layers, 2 mid layers, 2 outer layers
-4. Include at least 2 bottoms, 2–3 pairs of shoes
-5. Prioritize items that can work across multiple occasions
-6. Prefer neutral colors for versatility; a few accent pieces are fine
-7. Prioritize packing efficiency (fewer unique items that mix and match)
-8. Only use exact IDs from the catalog above
+1. Always include ALL protected items listed above
+2. Cover all weather conditions present in the trip schedule
+3. Include items for all activity types (hiking, dinner, casual, flights, shows)
+4. Ensure layering coverage: at least 3 base layers, 2 mid layers, 2 outer layers
+5. Include at least 2 bottoms, 2–3 pairs of shoes
+6. Prioritize items that work across multiple occasions
+7. Prefer neutral colors for versatility; a few accent pieces are fine
+8. Remove unnecessary duplicates — prefer versatile items over single-use ones
+9. Only use exact IDs from the catalog above
 
 Output ONLY a JSON object:
 {"capsuleIds": ["ID1", "ID2", "ID3"]}`;
@@ -267,7 +290,11 @@ Output ONLY a JSON object:
   }
 
   const validIds = new Set(wardrobe.map((i) => i.id));
-  return parsed.capsuleIds.filter((id) => validIds.has(id));
+  const aiIds = parsed.capsuleIds.filter((id) => validIds.has(id));
+
+  // Frozen items are always included regardless of what the AI returned
+  const finalIds = [...new Set([...frozenItemIds, ...aiIds])];
+  return finalIds;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────

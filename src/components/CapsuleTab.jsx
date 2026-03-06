@@ -5,12 +5,16 @@
      • Passed to AI generation instead of the full wardrobe
      • Listed in the Packing tab even if not yet in any outfit
 
-   "✨ Generate Trip Capsule" uses AI to auto-select ~25–35 versatile items.
+   "✨ Generate / Optimize Trip Capsule" uses AI to select ~20–35 items.
+   Frozen-outfit items are always preserved; AI suggests additions + removes
+   duplicates around them.
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useMemo } from "react";
 import { T, swatch, CAT_EMOJI } from "../theme";
 import { generateCapsuleWithAI } from "../utils/tripGenerator";
+
+const ALL_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
 
 /* ─── filter select helpers (shared style from WardrobeTab) ──────────────── */
 const selStyle = {
@@ -32,7 +36,7 @@ const selArrow  = (a) =>
   `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='${a ? "%230F0F12" : "%23C4C1BB"}'/%3E%3C/svg%3E")`;
 
 /* ─── Item card with capsule toggle ──────────────────────────────────────── */
-function CapsuleCard({ item, inCapsule, onToggle }) {
+function CapsuleCard({ item, inCapsule, isFrozenItem, onToggle }) {
   const [imgFailed, setImgFailed] = useState(false);
   const name  = item.n || item.itemName || "";
   const color = item.col || item.color || "Black";
@@ -84,16 +88,12 @@ function CapsuleCard({ item, inCapsule, onToggle }) {
           {inCapsule && (
             <div style={{
               position: "absolute", top: 6, right: 6,
-              background: "#0D4A43",
-              color: "#2DD4BF",
-              borderRadius: 6,
-              fontSize: 8,
-              fontWeight: 700,
-              padding: "2px 5px",
-              lineHeight: 1.4,
-              letterSpacing: 0.5,
+              background: isFrozenItem ? "#1E3A5F" : "#0D4A43",
+              color: isFrozenItem ? "#93C5FD" : "#2DD4BF",
+              borderRadius: 6, fontSize: 8, fontWeight: 700,
+              padding: "2px 5px", lineHeight: 1.4, letterSpacing: 0.5,
             }}>
-              ✈ TRIP
+              {isFrozenItem ? "🔒" : "✈ TRIP"}
             </div>
           )}
 
@@ -121,6 +121,8 @@ function CapsuleCard({ item, inCapsule, onToggle }) {
       {/* Toggle button — below card */}
       <button
         onClick={onToggle}
+        disabled={isFrozenItem && inCapsule}
+        title={isFrozenItem && inCapsule ? "In frozen outfit — always included" : undefined}
         style={{
           width: "100%",
           marginTop: 5,
@@ -129,22 +131,36 @@ function CapsuleCard({ item, inCapsule, onToggle }) {
           fontSize: 9,
           fontWeight: 700,
           letterSpacing: 0.5,
-          cursor: "pointer",
+          cursor: isFrozenItem && inCapsule ? "default" : "pointer",
           fontFamily: "inherit",
           transition: "all 0.15s",
-          border: inCapsule ? "1.5px solid #14B8A6" : `1.5px dashed ${T.borderLight}`,
-          background: inCapsule ? "#0D2E2B" : "none",
-          color: inCapsule ? "#2DD4BF" : T.light,
+          border: inCapsule
+            ? (isFrozenItem ? "1.5px solid #374151" : "1.5px solid #14B8A6")
+            : `1.5px dashed ${T.borderLight}`,
+          background: inCapsule
+            ? (isFrozenItem ? "#0F172A" : "#0D2E2B")
+            : "none",
+          color: inCapsule
+            ? (isFrozenItem ? "#60A5FA" : "#2DD4BF")
+            : T.light,
         }}
       >
-        {inCapsule ? "✓ In Trip" : "+ Add"}
+        {inCapsule ? (isFrozenItem ? "🔒 Outfit Item" : "✓ In Trip") : "+ Add"}
       </button>
     </div>
   );
 }
 
 /* ─── CAPSULE TAB ─────────────────────────────────────────────────────────── */
-export default function CapsuleTab({ wardrobe = [], capsuleIds, toggleCapsule, setManyCapsule, clearCapsule }) {
+export default function CapsuleTab({
+  wardrobe = [],
+  capsuleIds,
+  toggleCapsule,
+  setManyCapsule,
+  clearCapsule,
+  outfitIds = {},
+  frozenDays = {},
+}) {
   const [q,      setQ]      = useState("");
   const [cat,    setCat]    = useState("");
   const [showCapsuleOnly, setShowCapsuleOnly] = useState(false);
@@ -156,6 +172,25 @@ export default function CapsuleTab({ wardrobe = [], capsuleIds, toggleCapsule, s
 
   /* Filter options */
   const cats = useMemo(() => [...new Set(wardrobe.map((i) => i.c))].sort(), [wardrobe]);
+
+  /* Compute frozen outfit item IDs — these are always protected */
+  const frozenItemIds = useMemo(() => {
+    const ids = new Set();
+    Object.entries(outfitIds).forEach(([dayId, dayData]) => {
+      if (!frozenDays[dayId] || !dayData) return;
+      ALL_SLOTS.forEach((slot) => {
+        const slotIds = dayData[slot];
+        if (!slotIds) return;
+        Object.values(slotIds).forEach((id) => {
+          if (id && id !== "REMOVED") ids.add(id);
+        });
+      });
+    });
+    return ids;
+  }, [outfitIds, frozenDays]);
+
+  /* Whether capsule is empty but frozen outfits have items */
+  const canInitFromOutfits = capsuleIds.size === 0 && frozenItemIds.size > 0;
 
   /* Filtered list */
   const filtered = useMemo(() => {
@@ -176,13 +211,18 @@ export default function CapsuleTab({ wardrobe = [], capsuleIds, toggleCapsule, s
 
   const capsuleCount = capsuleIds.size;
 
+  /* Initialize capsule from frozen outfits */
+  function handleInitFromOutfits() {
+    setManyCapsule([...frozenItemIds]);
+  }
+
   async function handleGenerateCapsule() {
     if (aiLoading || wardrobe.length === 0) return;
     setAiLoading(true);
     setAiError(null);
     setAiDone(false);
     try {
-      const ids = await generateCapsuleWithAI({ wardrobe });
+      const ids = await generateCapsuleWithAI({ wardrobe, frozenItemIds });
       setManyCapsule(ids);
       setAiDone(true);
       setTimeout(() => setAiDone(false), 3000);
@@ -237,7 +277,71 @@ export default function CapsuleTab({ wardrobe = [], capsuleIds, toggleCapsule, s
         </p>
       </div>
 
-      {/* ── Generate AI Capsule ── */}
+      {/* ── Init from outfits CTA — shown when capsule is empty but frozen outfits exist ── */}
+      {canInitFromOutfits && (
+        <div style={{
+          marginBottom: 14,
+          background: "#0A1828",
+          border: "1.5px solid #1E3A5F",
+          borderRadius: 14,
+          padding: "12px 16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          flexWrap: "wrap",
+        }}>
+          <div>
+            <p style={{ fontSize: 12, fontWeight: 700, color: "#93C5FD" }}>
+              🔒 {frozenItemIds.size} items in frozen outfits
+            </p>
+            <p style={{ fontSize: 10, color: T.light, marginTop: 2 }}>
+              Initialize your capsule from your packing list
+            </p>
+          </div>
+          <button
+            onClick={handleInitFromOutfits}
+            style={{
+              padding: "7px 14px",
+              background: "#1E3A5F",
+              border: "1.5px solid #2563EB",
+              borderRadius: 10,
+              fontSize: 11,
+              fontWeight: 700,
+              color: "#93C5FD",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              whiteSpace: "nowrap",
+              flexShrink: 0,
+            }}
+          >
+            Initialize from Outfits →
+          </button>
+        </div>
+      )}
+
+      {/* Protected items notice — when capsule has items from frozen outfits */}
+      {frozenItemIds.size > 0 && capsuleCount > 0 && (
+        <div style={{
+          marginBottom: 14,
+          padding: "8px 12px",
+          background: "#0F172A",
+          border: "1px solid #1E293B",
+          borderRadius: 10,
+          fontSize: 10,
+          color: "#60A5FA",
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+        }}>
+          <span>🔒</span>
+          <span>
+            {frozenItemIds.size} items from frozen outfits are always included and cannot be removed
+          </span>
+        </div>
+      )}
+
+      {/* ── Generate / Optimize AI Capsule ── */}
       <div style={{ marginBottom: 16 }}>
         <button
           onClick={handleGenerateCapsule}
@@ -269,18 +373,21 @@ export default function CapsuleTab({ wardrobe = [], capsuleIds, toggleCapsule, s
           {aiLoading ? (
             <>
               <span style={{ animation: "spin 1.2s linear infinite", display: "inline-block" }}>◌</span>
-              Selecting best travel items…
+              {capsuleCount > 0 ? "Optimizing capsule…" : "Selecting best travel items…"}
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </>
           ) : aiDone ? (
             <>✓ {capsuleCount} items selected!</>
           ) : (
-            <>✨ Generate Trip Capsule</>
+            <>✨ {capsuleCount > 0 ? "Generate / Optimize Trip Capsule" : "Generate Trip Capsule"}</>
           )}
         </button>
         {!aiLoading && !aiDone && (
           <p style={{ fontSize: 10, color: T.light, marginTop: 5, textAlign: "center" }}>
-            AI selects ~25–35 versatile items based on weather, activities & layering
+            {capsuleCount > 0 && frozenItemIds.size > 0
+              ? `Protects ${frozenItemIds.size} frozen outfit items · suggests additions · removes unnecessary duplicates`
+              : "AI selects ~25–35 versatile items based on weather, activities & layering"
+            }
           </p>
         )}
         {aiError && (
@@ -350,6 +457,9 @@ export default function CapsuleTab({ wardrobe = [], capsuleIds, toggleCapsule, s
         {capsuleCount > 0 && !showCapsuleOnly && (
           <span style={{ color: "#2DD4BF", marginLeft: 6 }}>· {capsuleCount} in capsule</span>
         )}
+        {frozenItemIds.size > 0 && capsuleCount > 0 && (
+          <span style={{ color: "#60A5FA", marginLeft: 6 }}>· {frozenItemIds.size} from outfits</span>
+        )}
       </p>
 
       {/* ── Grid ── */}
@@ -367,7 +477,12 @@ export default function CapsuleTab({ wardrobe = [], capsuleIds, toggleCapsule, s
               key={item.id}
               item={item}
               inCapsule={capsuleIds.has(item.id)}
-              onToggle={() => toggleCapsule(item.id)}
+              isFrozenItem={frozenItemIds.has(item.id)}
+              onToggle={() => {
+                // Don't allow removing items that are in frozen outfits
+                if (frozenItemIds.has(item.id) && capsuleIds.has(item.id)) return;
+                toggleCapsule(item.id);
+              }}
             />
           ))}
         </div>
