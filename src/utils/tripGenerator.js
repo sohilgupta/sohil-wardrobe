@@ -220,24 +220,40 @@ export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, 
 
 /* ────────────────────────────────────────────────────────────────────────────
    generateSingleOutfit — one outfit for given occasion / weather / context.
-   Now restricted to TripItemPool when available.
+
+   For regen (single slot), uses capsule items OR travel-ready wardrobe — NOT
+   the frozen-outfits pool. Using the frozen pool causes always-same results
+   because it is made up of the exact items already assigned to frozen days.
+
+   Pass existingSlotIds so the AI knows what's currently worn and avoids
+   regenerating the same combination.
+
    Returns { base, mid, outer, bottom, shoes } with validated IDs (or null)
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, capsuleIds, outfitIds, frozenDays }) {
-  // Build Trip Item Pool
-  const tripItemPool = buildTripItemPool({
-    wardrobe,
-    capsuleIds,
-    outfitIds: outfitIds || {},
-    frozenDays: frozenDays || {},
-  });
+export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, capsuleIds, existingSlotIds }) {
+  // For regen: prefer capsule items if available, else travel-ready items.
+  // We intentionally do NOT restrict to tripItemPool (frozen outfits only) —
+  // that pool is too narrow for regen and causes the same outfit every time.
+  const wardrobeText = buildWardrobeText(wardrobe, capsuleIds && capsuleIds.size >= 8 ? capsuleIds : null);
+  const validIds = new Set(wardrobe.map((i) => i.id));
 
-  const wardrobeText = buildWardrobeText(wardrobe, tripItemPool);
-  const validIds = tripItemPool || new Set(wardrobe.map((i) => i.id));
-
-  const poolNote = tripItemPool
-    ? `\nIMPORTANT: Use ONLY the approved trip items listed in the catalog above.`
+  const capsuleNote = capsuleIds && capsuleIds.size >= 8
+    ? `\nNOTE: The catalog above shows your trip capsule items. Prefer these when possible.`
     : "";
+
+  // Build "avoid this combination" note from the current outfit
+  const avoidNote = (() => {
+    if (!existingSlotIds) return "";
+    const layers = ["base", "mid", "outer", "bottom", "shoes"].filter(
+      (l) => existingSlotIds[l] && existingSlotIds[l] !== "REMOVED"
+    );
+    if (layers.length === 0) return "";
+    const lines = layers.map((l) => {
+      const item = wardrobe.find((i) => i.id === existingSlotIds[l]);
+      return `  ${l}: ${item ? item.n : existingSlotIds[l]}`;
+    });
+    return `\nCURRENT OUTFIT — generate a DIFFERENT look (change at least the base layer and one other item):\n${lines.join("\n")}\n`;
+  })();
 
   const contextLines = [
     `Occasion: ${occ}`,
@@ -250,7 +266,7 @@ export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, 
 
   const prompt = `WARDROBE CATALOG (ID|Name|Layer|Color|Category):
 ${wardrobeText}
-${poolNote}
+${capsuleNote}${avoidNote}
 CONTEXT:
 ${contextLines}
 
@@ -259,6 +275,7 @@ RULES:
 2. Dinner / smart casual = polished; Casual = relaxed; Flight = comfortable; Hiking = practical
 3. Only use IDs that appear exactly in the catalog
 4. Use null for optional layers you choose not to include
+5. Generate a FRESH combination — do not reproduce the current outfit listed above
 
 Output ONLY a single JSON object (no markdown, no code blocks):
 {"base":"ITEM_ID","mid":"ITEM_ID_OR_NULL","outer":"ITEM_ID_OR_NULL","bottom":"ITEM_ID","shoes":"ITEM_ID"}`;
@@ -266,24 +283,12 @@ Output ONLY a single JSON object (no markdown, no code blocks):
   const rawText = await callAI({ system: SYSTEM_STYLIST, userContent: prompt, maxTokens: 2000 });
   const parsed = extractJSON(rawText);
 
-  // Step 1: validate against trip item pool (or full wardrobe when no pool)
+  // Validate all IDs against full wardrobe
   const result = {};
   ["base", "mid", "outer", "bottom", "shoes"].forEach((layer) => {
     const id = parsed[layer];
     result[layer] = id && validIds.has(id) ? id : null;
   });
-
-  // Step 2: for required layers still null, fall back to full wardrobe validation
-  // (handles edge case where AI returns a valid wardrobe ID not in the pool)
-  if (!result.base || !result.bottom || !result.shoes) {
-    const allIds = new Set(wardrobe.map((i) => i.id));
-    ["base", "bottom", "shoes"].forEach((layer) => {
-      if (!result[layer]) {
-        const id = parsed[layer];
-        result[layer] = id && allIds.has(id) ? id : null;
-      }
-    });
-  }
 
   if (!result.base || !result.bottom || !result.shoes) {
     throw new Error("AI returned an invalid outfit. Try again.");

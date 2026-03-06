@@ -434,8 +434,7 @@ export default function OutfitsTab({
         city:    selectedDay.city,
         act:     slotAct,
         capsuleIds,
-        outfitIds,
-        frozenDays,
+        existingSlotIds: prevSlotIds,  // tell AI what's currently worn → generate something different
       });
 
       // Re-apply REMOVED sentinels so the user's explicit layer removals are kept
