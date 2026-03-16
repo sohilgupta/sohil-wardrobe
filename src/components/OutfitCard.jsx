@@ -55,7 +55,10 @@ function PremiumItemThumb({ item, onSwap, width = 110, height = 110, alwaysSwap 
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div style={boxStyle}>
+      <div
+        style={{ ...boxStyle, cursor: onSwap ? "pointer" : boxStyle.cursor }}
+        onClick={onSwap ? (e) => { e.stopPropagation(); onSwap(); } : undefined}
+      >
         {/* ── texture overlay for swatches ── */}
         {!showImage && !missing && (
           <div
