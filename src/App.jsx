@@ -3,12 +3,14 @@ import { T } from "./theme";
 import useWardrobe from "./hooks/useWardrobe";
 import useOutfits from "./hooks/useOutfits";
 import useCapsule from "./hooks/useCapsule";
+import useProfile from "./hooks/useProfile";
 import WardrobeTab from "./components/WardrobeTab";
 import TripTab from "./components/TripTab";
 import OutfitTab from "./components/OutfitTab";
 import PackTab from "./components/PackTab";
 import OutfitsTab from "./components/OutfitsTab";
 import CapsuleTab from "./components/CapsuleTab";
+import ProfileTab from "./components/ProfileTab";
 import LoginPage from "./components/LoginPage";
 
 const NAV = [
@@ -18,6 +20,7 @@ const NAV = [
   { id: "daily",    icon: "◫", label: "DAILY" },
   { id: "outfit",   icon: "✦", label: "OUTFIT AI" },
   { id: "packing",  icon: "⊛", label: "PACKING" },
+  { id: "profile",  icon: "◉", label: "PROFILE" },
 ];
 
 const CACHE_KEYS = ["wdb_cache_v3", "wdb_overrides_v2", "wdb_drive_matches_v1"];
@@ -98,6 +101,9 @@ function AuthenticatedApp({ onLogout }) {
   // Trip Capsule — curated item subset for outfit planning + AI generation
   const { capsuleIds, toggleCapsule, setManyCapsule, clearCapsule } = useCapsule();
 
+  // Profile reference photos — used for outfit preview generation (PhotoMaker)
+  const { photos: profilePhotos, addPhoto, removePhoto, clearAll: clearAllPhotos, MAX_PHOTOS } = useProfile();
+
   const travel = wardrobe.filter((i) => i.t === "Yes").length;
   const capsuleCount = capsuleIds.size;
 
@@ -105,6 +111,11 @@ function AuthenticatedApp({ onLogout }) {
   function navigateToDay(dayId) {
     setFocusDayId(dayId);
     setTab("daily");
+  }
+
+  // Navigate to Profile tab (used from preview modal)
+  function navigateToProfile() {
+    setTab("profile");
   }
 
   return (
@@ -290,9 +301,18 @@ function AuthenticatedApp({ onLogout }) {
           />
         )}
         {tab === "trip"    && <TripTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} onNavigateToDay={navigateToDay} capsuleIds={capsuleIds} />}
-        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} toggleFreeze={toggleFreeze} focusDayId={focusDayId} onFocusConsumed={() => setFocusDayId(null)} capsuleIds={capsuleIds} />}
-        {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} />}
+        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} toggleFreeze={toggleFreeze} focusDayId={focusDayId} onFocusConsumed={() => setFocusDayId(null)} capsuleIds={capsuleIds} profilePhotos={profilePhotos} onNavigateToProfile={navigateToProfile} />}
+        {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} capsuleIds={capsuleIds} />}
         {tab === "packing" && <PackTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} capsuleIds={capsuleIds} />}
+        {tab === "profile" && (
+          <ProfileTab
+            photos={profilePhotos}
+            onAdd={addPhoto}
+            onRemove={removePhoto}
+            onClearAll={clearAllPhotos}
+            maxPhotos={MAX_PHOTOS}
+          />
+        )}
       </div>
     </div>
   );

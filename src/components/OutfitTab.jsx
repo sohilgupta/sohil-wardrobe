@@ -10,6 +10,7 @@ import { T } from "../theme";
 import TRIP from "../data/trip";
 import { generateSingleOutfit } from "../utils/tripGenerator";
 import OutfitCard from "./OutfitCard";
+import ItemPicker from "./ItemPicker";
 
 /* ── Resolve slot IDs → full item objects ─────────────────────────────────── */
 function resolveIds(ids, wardrobe) {
@@ -25,7 +26,7 @@ function resolveIds(ids, wardrobe) {
 }
 
 /* ─── OUTFIT AI TAB ─────────────────────────────────────────────────────── */
-export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds }) {
+export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds, capsuleIds }) {
   /* ── Generator inputs ── */
   const [occ, setOcc]   = useState("Casual");
   const [wth, setWth]   = useState("Mild");
@@ -38,12 +39,15 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds 
   const [generatedIds,  setGeneratedIds]  = useState(null); // slot IDs from AI
   const [generatedItem, setGeneratedItem] = useState(null); // resolved items
 
+  /* ── Manual item picker state ── */
+  const [pickerLayer, setPickerLayer] = useState(null); // layer being swapped
+
   /* ── Apply-to-Day state ── */
   const [applyDay,     setApplyDay]     = useState(TRIP[0]?.id || "");
   const [applySlot,    setApplySlot]    = useState("daytime");
   const [applySuccess, setApplySuccess] = useState(null);
 
-  /* ── Call Gemini for a single outfit ── */
+  /* ── Call AI for a single outfit ── */
   async function handleGenerate() {
     if (genLoading || wardrobe.length === 0) return;
     setGenLoading(true);
@@ -52,7 +56,7 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds 
     setGeneratedItem(null);
     setApplySuccess(null);
     try {
-      const ids = await generateSingleOutfit({ wardrobe, occ, weather: wth, city, act });
+      const ids = await generateSingleOutfit({ wardrobe, occ, weather: wth, city, act, capsuleIds });
       setGeneratedIds(ids);
       setGeneratedItem(resolveIds(ids, wardrobe));
     } catch (err) {
@@ -60,6 +64,20 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds 
     } finally {
       setGenLoading(false);
     }
+  }
+
+  /* ── Manual swap: open ItemPicker for the given layer ── */
+  function handleSwap(layer) {
+    setPickerLayer(layer);
+  }
+
+  /* ── Confirm manual item selection ── */
+  function handlePickerSelect(item) {
+    setPickerLayer(null);
+    const newIds  = { ...generatedIds, [pickerLayer]: item.id };
+    setGeneratedIds(newIds);
+    setGeneratedItem(resolveIds(newIds, wardrobe));
+    setApplySuccess(null);
   }
 
   /* ── Apply generated outfit to the selected day + slot ── */
@@ -293,7 +311,7 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds 
 
           <OutfitCard
             outfit={generatedItem}
-            onSwap={null}
+            onSwap={generatedItem ? handleSwap : null}
             onRegenerate={null}
             loading={genLoading}
           />
@@ -418,6 +436,20 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds 
             {applySuccess || "Apply to Day →"}
           </button>
         </div>
+      )}
+
+      {/* ── Item Picker modal ── */}
+      {pickerLayer && (
+        <ItemPicker
+          wardrobe={wardrobe}
+          layer={pickerLayer}
+          currentId={generatedIds?.[pickerLayer] || null}
+          outfitIds={outfitIds}
+          frozenDays={{}}
+          capsuleIds={capsuleIds}
+          onSelect={handlePickerSelect}
+          onClose={() => setPickerLayer(null)}
+        />
       )}
     </div>
   );

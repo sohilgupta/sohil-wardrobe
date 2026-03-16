@@ -6,22 +6,37 @@
      - PackTab     → optimizePackingWithAI + countUniqueItems
 
    All Gemini calls go through /api/ai (server-side key proxy).
+
+   Optimizations applied:
+     1. Skip already-generated days (no forced re-call by default)
+     2. Batch generation: multiple days per request
+     3. Cache results — same inputs → no API call
+     4. Trip Item Pool: send only capsule/frozen items, not full wardrobe
+     5. Compact wardrobe format (truncated names, minimal fields)
+     6. Rate limiting (text bucket: 5 calls / min)
+     7. Logging every AI call (including cache hits)
    ─────────────────────────────────────────────────────────────────────────── */
 
 import TRIP from "../data/trip";
+import { getCached, setCached, inputHash }  from "./aiCache";
+import { enforceRateLimit }                 from "./aiRateLimit";
+import { logAICall }                        from "./aiLogger";
 
-/* ── Internal: POST to /api/ai ────────────────────────────────────────────── */
-async function callAI({ system, userContent, maxTokens = 8000 }) {
+/* ── Internal: POST to /api/ai ─────────────────────────────────────────────── */
+async function callAI({ system, userContent, maxTokens = 8000, featureType = "unknown" }) {
+  enforceRateLimit("text");
+
   const res = await fetch("/api/ai", {
-    method: "POST",
+    method:  "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gemini-2.5-flash",
+      model:      "gemini-2.5-flash",
       max_tokens: maxTokens,
       system,
-      messages: [{ role: "user", content: userContent }],
+      messages:   [{ role: "user", content: userContent }],
     }),
   });
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     const msg =
@@ -30,11 +45,15 @@ async function callAI({ system, userContent, maxTokens = 8000 }) {
       `API error ${res.status}`;
     throw new Error(msg);
   }
-  const data = await res.json();
-  return data?.content?.[0]?.text || "";
+
+  const data   = await res.json();
+  const result = data?.content?.[0]?.text || "";
+
+  logAICall({ featureType, prompt: userContent, result });
+  return result;
 }
 
-/* ── Robustly extract JSON from raw Gemini text ──────────────────────────── */
+/* ── Robustly extract JSON from raw Gemini text ───────────────────────────── */
 function extractJSON(rawText) {
   const s = rawText.indexOf("{");
   const e = rawText.lastIndexOf("}");
@@ -54,26 +73,20 @@ function validateSlot(slot, validIds) {
   return result;
 }
 
-/* ── All outfit slot names ─────────────────────────────────────────────────── */
+/* ── All outfit slot names ──────────────────────────────────────────────────── */
 const ALL_OUTFIT_SLOTS = ["daytime", "evening", "breakfast", "sleepwear", "flight", "activity"];
 
 /* ────────────────────────────────────────────────────────────────────────────
    buildTripItemPool — compute the Set of approved item IDs for the trip.
 
    Pool = (capsule items) ∪ (items in any frozen outfit slot)
-   This is the only set of items the AI generators are allowed to use.
-
    Falls back to null (= full wardrobe) if pool is too small (< 8 items).
    ─────────────────────────────────────────────────────────────────────────── */
 export function buildTripItemPool({ wardrobe, capsuleIds, outfitIds = {}, frozenDays = {} }) {
   const poolIds = new Set();
 
-  // 1. Items in the trip capsule
-  if (capsuleIds) {
-    capsuleIds.forEach((id) => poolIds.add(id));
-  }
+  if (capsuleIds) capsuleIds.forEach((id) => poolIds.add(id));
 
-  // 2. Items in any frozen outfit slot (= packing list items)
   Object.entries(outfitIds).forEach(([dayId, dayData]) => {
     if (!frozenDays[dayId] || !dayData) return;
     ALL_OUTFIT_SLOTS.forEach((slot) => {
@@ -85,25 +98,28 @@ export function buildTripItemPool({ wardrobe, capsuleIds, outfitIds = {}, frozen
     });
   });
 
-  // Return null if pool is too small to reliably generate complete outfits
   return poolIds.size >= 8 ? poolIds : null;
 }
 
-/* ── Build compact wardrobe text — restricted to TripItemPool when available */
+/* ── Build compact wardrobe text — restricted to TripItemPool when available
+   Optimization #3+#5: use only approved items, truncate names to save tokens  */
 function buildWardrobeText(wardrobe, tripItemPool) {
+  // Format: id|name(≤18 chars)|layer|color|category
+  const fmt = (i) =>
+    `${i.id}|${i.n.slice(0, 18)}|${i.l || "?"}|${i.col}|${i.c}`;
+
   if (tripItemPool && tripItemPool.size > 0) {
     const pool = wardrobe.filter((i) => tripItemPool.has(i.id));
-    if (pool.length >= 8) {
-      return pool.map((i) => `${i.id}|${i.n}|${i.l || "?"}|${i.col}|${i.c}`).join("\n");
-    }
+    if (pool.length >= 8) return pool.map(fmt).join("\n");
   }
+
   // Fallback: prefer travel-ready items, then full wardrobe
   const travelItems = wardrobe.filter((i) => i.t === "Yes");
   const pool = travelItems.length >= 15 ? travelItems : wardrobe;
-  return pool.map((i) => `${i.id}|${i.n}|${i.l || "?"}|${i.col}|${i.c}`).join("\n");
+  return pool.map(fmt).join("\n");
 }
 
-/* ── Shared constants ─────────────────────────────────────────────────────── */
+/* ── Shared constants ───────────────────────────────────────────────────────── */
 const SYSTEM_STYLIST =
   "You are a personal travel stylist. Output ONLY valid JSON with no markdown, code blocks, or explanation. Never invent item IDs — use only exact IDs from the provided catalog.";
 
@@ -125,7 +141,8 @@ const EXAMPLE_OUTPUT = `Output ONLY a JSON object — no markdown, no code block
 }`;
 
 /* ────────────────────────────────────────────────────────────────────────────
-   countUniqueItems — count distinct item IDs across all outfit slots
+   countUniqueItems — count distinct item IDs across all outfit slots.
+   Deterministic — no AI needed.
    ─────────────────────────────────────────────────────────────────────────── */
 export function countUniqueItems(outfitIds) {
   const ids = new Set();
@@ -145,19 +162,33 @@ export function countUniqueItems(outfitIds) {
 /* ────────────────────────────────────────────────────────────────────────────
    generateTripOutfits — full trip generation in 2 sequential batches.
 
-   Now uses TripItemPool to restrict generation to approved items only:
-     Pool = capsule items ∪ items in frozen outfit slots
+   Optimization #1: Only generates days without existing outfits by default.
+   Pass force:true to regenerate all non-frozen days regardless.
+
+   Optimization #2: Sends all days in a batch — 2 batches for the full trip.
+
+   Optimization #3: Caches each batch result keyed by (wardrobeText + tripText).
+   Subsequent calls with unchanged inputs return the cached result instantly.
 
    Parameters:
      wardrobe      — full wardrobe array
      frozenDays    — { [dayId]: boolean }
+     outfitIds     — current outfit state (used to skip already-generated days)
      setOutfitIds  — React state setter from useOutfits
-     outfitIds     — current outfit state (needed to compute tripItemPool)
      capsuleIds    — Set<itemId> from useCapsule
-     onBatchDone   — optional callback after each batch (for progress updates)
-   Returns:        number of days generated
+     onBatchDone   — optional callback after each batch (progress updates)
+     force         — if true, regenerate all non-frozen days (default: false)
+   Returns: number of days generated (0 if all already have outfits)
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, onBatchDone, capsuleIds, outfitIds }) {
+export async function generateTripOutfits({
+  wardrobe,
+  frozenDays,
+  setOutfitIds,
+  onBatchDone,
+  capsuleIds,
+  outfitIds,
+  force = false,
+}) {
   // Build Trip Item Pool — restricts AI to approved items only
   const tripItemPool = buildTripItemPool({
     wardrobe,
@@ -167,12 +198,26 @@ export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, 
   });
 
   const wardrobeText = buildWardrobeText(wardrobe, tripItemPool);
-  // Validate returned IDs against the same pool (falls back to full wardrobe if pool was too small)
-  const validIds = tripItemPool || new Set(wardrobe.map((i) => i.id));
+  const validIds     = tripItemPool || new Set(wardrobe.map((i) => i.id));
 
-  const daysToGen = TRIP.filter((d) => !frozenDays[d.id]);
-  if (daysToGen.length === 0)
-    throw new Error("All days are frozen. Unfreeze some days first.");
+  // Optimization #1: Skip frozen days AND (unless force=true) days that
+  // already have a generated daytime outfit.
+  const daysToGen = TRIP.filter((d) => {
+    if (frozenDays[d.id]) return false;
+    if (!force) {
+      const existing = outfitIds?.[d.id];
+      if (existing?.daytime?.base) return false; // already generated
+    }
+    return true;
+  });
+
+  if (daysToGen.length === 0) {
+    if (force) {
+      throw new Error("All days are frozen. Unfreeze some days first.");
+    }
+    // All non-frozen days already have outfits — nothing to do
+    return 0;
+  }
 
   const poolNote = tripItemPool
     ? `\nIMPORTANT: The catalog above contains ONLY your approved trip items. Use ONLY these IDs.`
@@ -205,8 +250,27 @@ export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, 
       .join("\n");
 
     const prompt = `WARDROBE CATALOG (ID|Name|Layer|Color|Category):\n${wardrobeText}\n${poolNote}\n\nTRIP SCHEDULE:\n${tripText}\n\n${OUTFIT_RULES}\n\nGenerate outfits for ALL days listed above.\n\n${EXAMPLE_OUTPUT}`;
-    const rawText = await callAI({ system: SYSTEM_STYLIST, userContent: prompt, maxTokens: 8000 });
+
+    // Optimization #3: check cache before hitting the API
+    const hash   = inputHash({ wardrobeText, tripText });
+    const cached = getCached({ featureType: "outfitGeneration", hash });
+
+    if (cached) {
+      logAICall({ featureType: "outfitGeneration", cached: true });
+      applyParsed(cached);
+      if (onBatchDone) onBatchDone();
+      return;
+    }
+
+    const rawText = await callAI({
+      system:      SYSTEM_STYLIST,
+      userContent: prompt,
+      maxTokens:   8000,
+      featureType: "outfitGeneration",
+    });
+
     const parsed = extractJSON(rawText);
+    setCached({ featureType: "outfitGeneration", hash, value: parsed });
     applyParsed(parsed);
     if (onBatchDone) onBatchDone();
   };
@@ -219,29 +283,34 @@ export async function generateTripOutfits({ wardrobe, frozenDays, setOutfitIds, 
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   generateSingleOutfit — one outfit for given occasion / weather / context.
+   generateSingleOutfit — one outfit for a given occasion / weather / context.
 
-   For regen (single slot), uses capsule items OR travel-ready wardrobe — NOT
-   the frozen-outfits pool. Using the frozen pool causes always-same results
-   because it is made up of the exact items already assigned to frozen days.
+   Optimization: prefers capsule/travel-ready items (not frozen pool) so
+   regeneration always has variety. Rate-limited and logged.
 
-   Pass existingSlotIds so the AI knows what's currently worn and avoids
-   regenerating the same combination.
-
-   Returns { base, mid, outer, bottom, shoes } with validated IDs (or null)
+   Returns { base, mid, outer, bottom, shoes } with validated IDs (or null).
    ─────────────────────────────────────────────────────────────────────────── */
-export async function generateSingleOutfit({ wardrobe, occ, weather, city, act, capsuleIds, existingSlotIds }) {
-  // For regen: prefer capsule items if available, else travel-ready items.
-  // We intentionally do NOT restrict to tripItemPool (frozen outfits only) —
-  // that pool is too narrow for regen and causes the same outfit every time.
-  const wardrobeText = buildWardrobeText(wardrobe, capsuleIds && capsuleIds.size >= 8 ? capsuleIds : null);
-  const validIds = new Set(wardrobe.map((i) => i.id));
+export async function generateSingleOutfit({
+  wardrobe,
+  occ,
+  weather,
+  city,
+  act,
+  capsuleIds,
+  existingSlotIds,
+}) {
+  const hasCapsule = capsuleIds && capsuleIds.size >= 8;
+  const wardrobeText = buildWardrobeText(wardrobe, hasCapsule ? capsuleIds : null);
 
-  const capsuleNote = capsuleIds && capsuleIds.size >= 8
-    ? `\nNOTE: The catalog above shows your trip capsule items. Prefer these when possible.`
+  // Restrict valid IDs to capsule-only when capsule is active — prevents non-capsule items slipping through
+  const validIds = hasCapsule
+    ? new Set(wardrobe.filter((i) => capsuleIds.has(i.id)).map((i) => i.id))
+    : new Set(wardrobe.map((i) => i.id));
+
+  const capsuleNote = hasCapsule
+    ? `\nIMPORTANT: The catalog above contains ONLY your approved trip capsule items. You MUST use ONLY these exact IDs — do not use any other item IDs.`
     : "";
 
-  // Build "avoid this combination" note from the current outfit
   const avoidNote = (() => {
     if (!existingSlotIds) return "";
     const layers = ["base", "mid", "outer", "bottom", "shoes"].filter(
@@ -280,10 +349,14 @@ RULES:
 Output ONLY a single JSON object (no markdown, no code blocks):
 {"base":"ITEM_ID","mid":"ITEM_ID_OR_NULL","outer":"ITEM_ID_OR_NULL","bottom":"ITEM_ID","shoes":"ITEM_ID"}`;
 
-  const rawText = await callAI({ system: SYSTEM_STYLIST, userContent: prompt, maxTokens: 2000 });
-  const parsed = extractJSON(rawText);
+  const rawText = await callAI({
+    system:      SYSTEM_STYLIST,
+    userContent: prompt,
+    maxTokens:   2000,
+    featureType: "singleOutfit",
+  });
 
-  // Validate all IDs against full wardrobe
+  const parsed = extractJSON(rawText);
   const result = {};
   ["base", "mid", "outer", "bottom", "shoes"].forEach((layer) => {
     const id = parsed[layer];
@@ -298,44 +371,38 @@ Output ONLY a single JSON object (no markdown, no code blocks):
 
 /* ────────────────────────────────────────────────────────────────────────────
    generateCapsuleWithAI — selects ~20–35 versatile items for the trip capsule.
-   Takes the full wardrobe (so the AI can consider all options) and returns an
-   array of item IDs chosen for maximum versatility, layering, and efficiency.
 
-   Parameters:
-     wardrobe      — full wardrobe array
-     frozenItemIds — Set<itemId> of items already in frozen outfits (protected)
-   These frozen-outfit items are ALWAYS included in the result; the AI is asked
-   to suggest additional items and remove unnecessary duplicates around them.
+   Optimization #7: Checks cache first — only calls AI if inputs have changed
+   or the cached result has expired (7 days TTL).
    ─────────────────────────────────────────────────────────────────────────── */
 export async function generateCapsuleWithAI({ wardrobe, frozenItemIds = new Set() }) {
   if (wardrobe.length === 0) throw new Error("Wardrobe is empty.");
 
-  // Build a richer per-item description including weather tag
   const allItemsText = wardrobe
-    .map((i) => `${i.id}|${i.n}|${i.l || "?"}|${i.col}|${i.c}|${i.w || "?"}`)
+    .map((i) => `${i.id}|${i.n.slice(0, 18)}|${i.l || "?"}|${i.col}|${i.c}|${i.w || "?"}`)
     .join("\n");
 
-  // Summarise trip weather + activities from TRIP data
   const tripSummary = TRIP
     .map((d) => `${d.date}: ${d.city}, Weather: ${d.w}, Day: ${d.day || d.occ}, Evening: ${d.night || "Casual"}`)
     .join("\n");
 
-  // List frozen items that must be preserved
   const frozenList = wardrobe
     .filter((i) => frozenItemIds.has(i.id))
-    .map((i) => `${i.id}|${i.n}|${i.l || "?"}`)
+    .map((i) => `${i.id}|${i.n.slice(0, 18)}|${i.l || "?"}`)
     .join("\n");
 
   const SYSTEM_CAPSULE =
     "You are an expert travel packing consultant. Output ONLY valid JSON with no markdown, code blocks, or explanation. Never invent item IDs — use only exact IDs from the provided catalog.";
 
-  const frozenSection = frozenItemIds.size > 0
-    ? `\nPROTECTED ITEMS (already in frozen outfits — MUST be included in capsuleIds):\n${frozenList}\n`
-    : "";
+  const frozenSection =
+    frozenItemIds.size > 0
+      ? `\nPROTECTED ITEMS (already in frozen outfits — MUST be included in capsuleIds):\n${frozenList}\n`
+      : "";
 
-  const targetRange = frozenItemIds.size > 0
-    ? "Aim for 20–35 total items (including all protected items above)."
-    : "Select 25–35 versatile items.";
+  const targetRange =
+    frozenItemIds.size > 0
+      ? "Aim for 20–35 total items (including all protected items above)."
+      : "Select 25–35 versatile items.";
 
   const prompt = `FULL WARDROBE (ID|Name|Layer|Color|Category|Weather):
 ${allItemsText}
@@ -359,26 +426,41 @@ SELECTION RULES:
 Output ONLY a JSON object:
 {"capsuleIds": ["ID1", "ID2", "ID3"]}`;
 
-  const rawText = await callAI({ system: SYSTEM_CAPSULE, userContent: prompt, maxTokens: 2000 });
-  const parsed = extractJSON(rawText);
+  // Optimization #7: cache check
+  const hash   = inputHash({ allItemsText, frozenList });
+  const cached = getCached({ featureType: "capsuleGeneration", hash });
 
+  if (cached) {
+    logAICall({ featureType: "capsuleGeneration", cached: true });
+    const validIds  = new Set(wardrobe.map((i) => i.id));
+    const validCached = cached.filter((id) => validIds.has(id));
+    return [...new Set([...frozenItemIds, ...validCached])];
+  }
+
+  const rawText = await callAI({
+    system:      SYSTEM_CAPSULE,
+    userContent: prompt,
+    maxTokens:   2000,
+    featureType: "capsuleGeneration",
+  });
+
+  const parsed = extractJSON(rawText);
   if (!Array.isArray(parsed.capsuleIds)) {
     throw new Error("AI returned invalid capsule format. Try again.");
   }
 
   const validIds = new Set(wardrobe.map((i) => i.id));
-  const aiIds = parsed.capsuleIds.filter((id) => validIds.has(id));
-
-  // Frozen items are always included regardless of what the AI returned
+  const aiIds    = parsed.capsuleIds.filter((id) => validIds.has(id));
   const finalIds = [...new Set([...frozenItemIds, ...aiIds])];
+
+  setCached({ featureType: "capsuleGeneration", hash, value: aiIds });
   return finalIds;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
-   optimizePackingWithAI — re-assigns items across all planned days to minimize
-   the total unique item count (frozen days are never changed).
-   Returns { beforeCount, afterCount, proposed } where proposed is a new
-   outfitIds object ready to be applied via setOutfitIds.
+   optimizePackingWithAI — re-assigns items to minimise total unique item count.
+   Frozen days are never changed. Deterministic tasks (dedup, sort, counts)
+   are done client-side before/after this call.
    ─────────────────────────────────────────────────────────────────────────── */
 export async function optimizePackingWithAI({ wardrobe, outfitIds, frozenDays = {} }) {
   const plannedEntries = Object.entries(outfitIds).filter(
@@ -387,16 +469,15 @@ export async function optimizePackingWithAI({ wardrobe, outfitIds, frozenDays = 
   if (plannedEntries.length === 0)
     throw new Error("No planned outfits found to optimize.");
 
-  const beforeCount = countUniqueItems(outfitIds);
+  const beforeCount  = countUniqueItems(outfitIds);
   const wardrobeText = buildWardrobeText(wardrobe, null);
-  const wardrobeIds = new Set(wardrobe.map((i) => i.id));
+  const wardrobeIds  = new Set(wardrobe.map((i) => i.id));
 
-  // Current outfit assignments text — locked days clearly marked
   const currentText = plannedEntries
     .map(([dayId, dayData]) => {
       const tripDay = TRIP.find((d) => d.id === dayId);
-      const locked = frozenDays[dayId] ? " [LOCKED — do not change]" : "";
-      const label = tripDay
+      const locked  = frozenDays[dayId] ? " [LOCKED — do not change]" : "";
+      const label   = tripDay
         ? `${dayId} (${tripDay.city}, ${tripDay.w})${locked}`
         : `${dayId}${locked}`;
 
@@ -411,9 +492,7 @@ export async function optimizePackingWithAI({ wardrobe, outfitIds, frozenDays = 
         );
       };
 
-      return `${label}:\n  daytime: ${fmtSlot(dayData.daytime)}\n  evening: ${fmtSlot(
-        dayData.evening
-      )}`;
+      return `${label}:\n  daytime: ${fmtSlot(dayData.daytime)}\n  evening: ${fmtSlot(dayData.evening)}`;
     })
     .join("\n");
 
@@ -444,19 +523,22 @@ Output ONLY a JSON object with ALL planned days (same structure as input, even f
   }
 }`;
 
-  const rawText = await callAI({ system: SYSTEM, userContent: prompt, maxTokens: 8000 });
+  const rawText = await callAI({
+    system:      SYSTEM,
+    userContent: prompt,
+    maxTokens:   8000,
+    featureType: "packingOptimization",
+  });
+
   const parsed = extractJSON(rawText);
 
-  // Build proposed outfitIds — never override frozen days
   const proposed = { ...outfitIds };
   Object.entries(parsed).forEach(([dayId, dayData]) => {
-    if (frozenDays[dayId]) return; // never touch frozen days
+    if (frozenDays[dayId]) return;
     const existing = outfitIds[dayId];
-    if (!existing) return; // don't add new days
-
+    if (!existing) return;
     const dt = validateSlot(dayData?.daytime, wardrobeIds);
     const ev = validateSlot(dayData?.evening, wardrobeIds);
-
     proposed[dayId] = {
       daytime: dt || existing.daytime,
       evening: ev || existing.evening,
