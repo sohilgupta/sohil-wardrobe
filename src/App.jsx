@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { T } from "./theme";
+import { AuthProvider, useAuth, usePlan } from "./contexts/AuthContext";
 import useWardrobe from "./hooks/useWardrobe";
 import useOutfits from "./hooks/useOutfits";
 import useCapsule from "./hooks/useCapsule";
@@ -11,7 +12,7 @@ import PackTab from "./components/PackTab";
 import OutfitsTab from "./components/OutfitsTab";
 import CapsuleTab from "./components/CapsuleTab";
 import ProfileTab from "./components/ProfileTab";
-import LoginPage from "./components/LoginPage";
+import AuthPage from "./components/AuthPage";
 
 const NAV = [
   { id: "wardrobe", icon: "⊞", label: "WARDROBE" },
@@ -23,29 +24,20 @@ const NAV = [
   { id: "profile",  icon: "◉", label: "PROFILE" },
 ];
 
-const CACHE_KEYS = ["wdb_cache_v3", "wdb_overrides_v2", "wdb_drive_matches_v1"];
-
-/* ─── ROOT — handles auth state before rendering anything sensitive ────────── */
+/* ─── ROOT — wraps everything in AuthProvider ─────────────────────────────── */
 export default function App() {
-  // "checking" | "authenticated" | "unauthenticated"
-  const [authState, setAuthState] = useState("checking");
+  return (
+    <AuthProvider>
+      <AppInner />
+    </AuthProvider>
+  );
+}
 
-  useEffect(() => {
-    fetch("/api/auth/check")
-      .then(async (r) => {
-        if (!r.ok) { setAuthState("unauthenticated"); return; }
-        // Parse JSON to confirm a real auth response (not an SPA HTML fallback)
-        try {
-          const data = await r.json();
-          setAuthState(data.authenticated === true ? "authenticated" : "unauthenticated");
-        } catch {
-          setAuthState("unauthenticated");
-        }
-      })
-      .catch(() => setAuthState("unauthenticated"));
-  }, []);
+/* ─── INNER — reads auth state after provider is mounted ──────────────────── */
+function AppInner() {
+  const { user, loading, signOut } = useAuth();
 
-  if (authState === "checking") {
+  if (loading) {
     return (
       <div
         style={{
@@ -57,32 +49,38 @@ export default function App() {
           fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
         }}
       >
-        <p style={{ fontSize: 10, color: T.light, letterSpacing: 3, fontWeight: 600 }}>
-          LOADING…
-        </p>
+        <div style={{ textAlign: "center" }}>
+          <p
+            style={{
+              fontFamily: "'Cormorant Garamond',serif",
+              fontSize: 28,
+              fontWeight: 700,
+              color: T.text,
+              marginBottom: 12,
+            }}
+          >
+            Vesti
+          </p>
+          <p style={{ fontSize: 10, color: T.light, letterSpacing: 3, fontWeight: 600 }}>
+            LOADING…
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (authState === "unauthenticated") {
-    return <LoginPage onLogin={() => setAuthState("authenticated")} />;
+  if (!user) {
+    return <AuthPage />;
   }
 
-  async function handleLogout() {
-    // Clear all local caches before expiring the session cookie
-    CACHE_KEYS.forEach((k) => localStorage.removeItem(k));
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-    setAuthState("unauthenticated");
-  }
-
-  return <AuthenticatedApp onLogout={handleLogout} />;
+  return <AuthenticatedApp onLogout={signOut} />;
 }
 
 /* ─── AUTHENTICATED APP — only mounts after auth check passes ─────────────── */
 function AuthenticatedApp({ onLogout }) {
   const [tab, setTab] = useState("wardrobe");
-  // focusDayId: when set, OutfitsTab auto-selects that day on mount/change
   const [focusDayId, setFocusDayId] = useState(null);
+  const { isPro } = usePlan();
 
   const {
     items:      wardrobe,
@@ -95,25 +93,18 @@ function AuthenticatedApp({ onLogout }) {
     addItem,
   } = useWardrobe();
 
-  // Outfit-per-day state — shared between Daily and Packing tabs
   const { outfitIds, setOutfitIds, frozenDays, toggleFreeze } = useOutfits();
-
-  // Trip Capsule — curated item subset for outfit planning + AI generation
   const { capsuleIds, toggleCapsule, setManyCapsule, clearCapsule } = useCapsule();
-
-  // Profile reference photos — used for outfit preview generation (PhotoMaker)
   const { photos: profilePhotos, addPhoto, removePhoto, clearAll: clearAllPhotos, MAX_PHOTOS } = useProfile();
 
-  const travel = wardrobe.filter((i) => i.t === "Yes").length;
+  const travel      = wardrobe.filter((i) => i.t === "Yes").length;
   const capsuleCount = capsuleIds.size;
 
-  // Navigate to Daily tab and focus a specific day
   function navigateToDay(dayId) {
     setFocusDayId(dayId);
     setTab("daily");
   }
 
-  // Navigate to Profile tab (used from preview modal)
   function navigateToProfile() {
     setTab("profile");
   }
@@ -125,6 +116,8 @@ function AuthenticatedApp({ onLogout }) {
         background: T.bg,
         fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
         color: T.text,
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       <style>{`
@@ -164,17 +157,29 @@ function AuthenticatedApp({ onLogout }) {
               <span
                 style={{
                   fontFamily: "'Cormorant Garamond',serif",
-                  fontSize: 22,
+                  fontSize: 24,
                   fontWeight: 700,
                   letterSpacing: -0.5,
                   color: T.text,
                 }}
               >
-                SOHIL-WARDROBE
+                Vesti
               </span>
-              <span style={{ fontSize: 10, color: T.light, letterSpacing: 2, fontWeight: 600 }}>
-                AUS·NZ 2026
-              </span>
+              {isPro && (
+                <span
+                  style={{
+                    fontSize: 9,
+                    color: "#A78BFA",
+                    letterSpacing: 1.5,
+                    fontWeight: 700,
+                    background: "#2E1065",
+                    padding: "2px 6px",
+                    borderRadius: 4,
+                  }}
+                >
+                  PRO
+                </span>
+              )}
             </div>
             <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
               <div style={{ textAlign: "center" }}>
@@ -207,10 +212,9 @@ function AuthenticatedApp({ onLogout }) {
                   <p style={{ fontSize: 8, color: "#2DD4BF", letterSpacing: 1, marginTop: 1 }}>CAPSULE</p>
                 </button>
               )}
-              {/* Logout */}
               <button
                 onClick={onLogout}
-                title="Log out"
+                title="Sign out"
                 style={{
                   background: "none",
                   border: `1px solid ${T.border}`,
@@ -276,7 +280,7 @@ function AuthenticatedApp({ onLogout }) {
       </div>
 
       {/* Content */}
-      <div style={{ maxWidth: 700, margin: "0 auto", padding: "20px 16px 100px" }}>
+      <div style={{ flex: 1, maxWidth: 700, margin: "0 auto", padding: "20px 16px 40px", width: "100%" }}>
         {tab === "wardrobe" && (
           <WardrobeTab
             wardrobe={wardrobe}
@@ -314,6 +318,26 @@ function AuthenticatedApp({ onLogout }) {
           />
         )}
       </div>
+
+      {/* Footer */}
+      <AppFooter />
     </div>
+  );
+}
+
+function AppFooter() {
+  return (
+    <footer
+      style={{
+        borderTop: `1px solid ${T.borderLight}`,
+        padding: "16px",
+        textAlign: "center",
+        background: T.surface,
+      }}
+    >
+      <p style={{ fontSize: 10, color: T.light, letterSpacing: 0.5 }}>
+        Designed &amp; developed by Sohil Gupta
+      </p>
+    </footer>
   );
 }

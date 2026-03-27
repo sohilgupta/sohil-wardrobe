@@ -1,7 +1,7 @@
 {
-  "name": "sohil-wardrobe",
+  "name": "vesti",
   "private": true,
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,9 +10,13 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@stripe/stripe-js": "^4.8.0",
+    "@supabase/supabase-js": "^2.47.0",
     "bcryptjs": "^3.0.3",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "stripe": "^17.3.0",
+    "vercel": "^50.37.2"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.0",

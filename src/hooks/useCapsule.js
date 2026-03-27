@@ -1,125 +1,164 @@
 /* ─── useCapsule hook ────────────────────────────────────────────────────────
-   Manages the Trip Capsule — a curated subset of wardrobe items used to
-   narrow the outfit picker and AI generation to a travel-ready shortlist.
+   Manages the Trip Capsule — a curated subset of wardrobe items.
+   Scoped per authenticated user.
 
    Persistence:
-   - Primary: /api/capsule backend (KV store, cross-device sync)
-   - Cache: localStorage "wdb_capsule_v1" (instant local reads)
-
-   Backend is the source of truth. On mount + page focus + every 5 min:
-   re-fetches from backend and replaces local state. On any change:
-   saves to localStorage + debounced push to backend.
+   - Primary:   Supabase profiles.capsule_ids (cross-device, linked to account)
+   - Secondary: localStorage (instant cache, namespaced by userId)
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useUser } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 
-const LS_KEY = "wdb_capsule_v1";
+/* ── Per-user storage key ──────────────────────────────────────────────────── */
+function lsKey(userId) {
+  return userId ? `vesti_${userId}_capsule_v1` : "vesti_capsule_v1";
+}
 
-/* ── localStorage helpers ──────────────────────────────────────────────────── */
-function loadLocal() {
+function loadLocal(userId) {
   try {
-    const raw = JSON.parse(localStorage.getItem(LS_KEY));
-    return Array.isArray(raw) ? new Set(raw) : new Set();
+    const raw = JSON.parse(localStorage.getItem(lsKey(userId)));
+    if (Array.isArray(raw)) return new Set(raw);
+    // Migrate from legacy key
+    const legacy = JSON.parse(localStorage.getItem("wdb_capsule_v1"));
+    return Array.isArray(legacy) ? new Set(legacy) : new Set();
   } catch {
     return new Set();
   }
 }
 
-function saveLocal(ids) {
+function saveLocal(userId, ids) {
   try {
-    localStorage.setItem(LS_KEY, JSON.stringify([...ids]));
-  } catch { /* quota */ }
+    localStorage.setItem(lsKey(userId), JSON.stringify([...ids]));
+  } catch {}
 }
 
 /* ── Hook ─────────────────────────────────────────────────────────────────── */
 export default function useCapsule() {
-  const [capsuleIds, _setCapsuleIds] = useState(() => loadLocal());
+  const user   = useUser();
+  const userId = user?.id ?? null;
 
-  // Ref always reflects latest — avoids stale closures in callbacks
-  const capsuleRef  = useRef(loadLocal());
+  const [capsuleIds, _setCapsuleIds] = useState(() => loadLocal(userId));
+  const capsuleRef  = useRef(loadLocal(userId));
   const syncTimer   = useRef(null);
-  // Track whether backend has been fetched at least once
-  const fetchedOnce = useRef(false);
 
-  /* ── Push current state to backend (debounced 300ms) ── */
+  /* ── Push to Supabase (debounced 500ms) ── */
   const pushToBackend = useCallback((ids) => {
+    if (!userId) return;
     if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => {
-      fetch("/api/capsule", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: [...ids] }),
-      }).catch(() => {}); // silently fail if backend unavailable
-    }, 300);
-  }, []);
+    syncTimer.current = setTimeout(async () => {
+      try {
+        await supabase
+          .from("profiles")
+          .update({ capsule_ids: [...ids] })
+          .eq("id", userId);
+      } catch {}
+    }, 500);
+  }, [userId]);
 
-  /* ── Fetch from backend and replace local state ── */
-  const fetchFromBackend = useCallback(() => {
-    fetch("/api/capsule")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data || !Array.isArray(data.ids)) return;
-        // Backend is source of truth — replace local state entirely
-        const next = new Set(data.ids);
-        capsuleRef.current = next;
-        saveLocal(next);
-        _setCapsuleIds(next);
-        fetchedOnce.current = true;
-      })
-      .catch(() => {
-        // Backend unavailable — keep localStorage as fallback
-        fetchedOnce.current = true;
-      });
-  }, []);
+  /* ── Fetch from Supabase ── */
+  const fetchFromBackend = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const { data } = await supabase
+        .from("profiles")
+        .select("capsule_ids")
+        .eq("id", userId)
+        .single();
 
-  /* ── On mount: fetch from backend ── */
-  useEffect(() => { fetchFromBackend(); }, [fetchFromBackend]);
+      if (!data || !Array.isArray(data.capsule_ids)) return;
+      const next = new Set(data.capsule_ids);
+      capsuleRef.current = next;
+      saveLocal(userId, next);
+      _setCapsuleIds(next);
+    } catch {}
+  }, [userId]);
 
-  /* ── On page focus: re-sync (cross-device awareness) ── */
+  /* ── On userId change: load local, sync with remote ── */
+  useEffect(() => {
+    const local = loadLocal(userId);
+    capsuleRef.current = local;
+    _setCapsuleIds(local);
+
+    if (!userId) return;
+
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("capsule_ids")
+          .eq("id", userId)
+          .single();
+
+        if (!data || !Array.isArray(data.capsule_ids) || data.capsule_ids.length === 0) {
+          // Remote empty — push local up if we have items
+          if (local.size > 0) {
+            await supabase
+              .from("profiles")
+              .update({ capsule_ids: [...local] })
+              .eq("id", userId);
+          }
+        } else {
+          // Remote has data — use it (remote wins)
+          const next = new Set(data.capsule_ids);
+          capsuleRef.current = next;
+          saveLocal(userId, next);
+          _setCapsuleIds(next);
+        }
+      } catch {}
+    })();
+  }, [userId]);
+
+  /* ── Reload after one-time data migration ── */
+  useEffect(() => {
+    function handleMigration(e) {
+      if (e.detail?.userId !== userId) return;
+      const local = loadLocal(userId);
+      capsuleRef.current = local;
+      _setCapsuleIds(local);
+      pushToBackend(local);
+    }
+    window.addEventListener("vesti-data-migrated", handleMigration);
+    return () => window.removeEventListener("vesti-data-migrated", handleMigration);
+  }, [userId, pushToBackend]);
+
   useEffect(() => {
     window.addEventListener("focus", fetchFromBackend);
     return () => window.removeEventListener("focus", fetchFromBackend);
   }, [fetchFromBackend]);
 
-  /* ── Background refresh every 5 minutes ── */
   useEffect(() => {
     const interval = setInterval(fetchFromBackend, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchFromBackend]);
 
-  /* ── toggleCapsule: add/remove a single item ── */
   const toggleCapsule = useCallback((id) => {
     _setCapsuleIds((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       capsuleRef.current = next;
-      saveLocal(next);
+      saveLocal(userId, next);
       pushToBackend(next);
       return next;
     });
-  }, [pushToBackend]);
+  }, [pushToBackend, userId]);
 
-  /* ── setManyCapsule: replace entire capsule (AI generation / init) ── */
   const setManyCapsule = useCallback((ids) => {
     const next = new Set(ids);
     capsuleRef.current = next;
-    saveLocal(next);
+    saveLocal(userId, next);
     pushToBackend(next);
     _setCapsuleIds(next);
-  }, [pushToBackend]);
+  }, [pushToBackend, userId]);
 
-  /* ── clearCapsule: remove all items ── */
   const clearCapsule = useCallback(() => {
     const next = new Set();
     capsuleRef.current = next;
-    saveLocal(next);
+    saveLocal(userId, next);
     pushToBackend(next);
     _setCapsuleIds(next);
-  }, [pushToBackend]);
+  }, [pushToBackend, userId]);
 
-  return { capsuleIds, toggleCapsule, setManyCapsule, clearCapsule, fetchedOnce };
+  return { capsuleIds, toggleCapsule, setManyCapsule, clearCapsule };
 }
