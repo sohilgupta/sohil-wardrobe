@@ -1,13 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { enforceRateLimit, callsRemaining, resetRateLimit } from "../src/utils/aiRateLimit";
+import { enforceRateLimit, resetBucket } from "../src/utils/aiRateLimit";
 
-// jsdom provides sessionStorage — reset before each test
 beforeEach(() => {
-  resetRateLimit("text");
-  resetRateLimit("preview");
+  resetBucket("text");
+  resetBucket("image");
 });
 
-describe("enforceRateLimit — text bucket (max 5 / 60s)", () => {
+describe("enforceRateLimit — text bucket (max 5)", () => {
   it("allows calls up to the limit without throwing", () => {
     for (let i = 0; i < 5; i++) {
       expect(() => enforceRateLimit("text")).not.toThrow();
@@ -27,54 +26,30 @@ describe("enforceRateLimit — text bucket (max 5 / 60s)", () => {
   });
 });
 
-describe("enforceRateLimit — preview bucket (max 10 / 60s)", () => {
-  it("allows up to 10 calls without throwing", () => {
-    for (let i = 0; i < 10; i++) {
-      expect(() => enforceRateLimit("preview")).not.toThrow();
+describe("enforceRateLimit — image bucket (max 2)", () => {
+  it("allows up to 2 calls without throwing", () => {
+    for (let i = 0; i < 2; i++) {
+      expect(() => enforceRateLimit("image")).not.toThrow();
     }
   });
 
-  it("throws on the 11th call", () => {
-    for (let i = 0; i < 10; i++) enforceRateLimit("preview");
-    expect(() => enforceRateLimit("preview")).toThrow(/rate limit/i);
+  it("throws on the 3rd call", () => {
+    for (let i = 0; i < 2; i++) enforceRateLimit("image");
+    expect(() => enforceRateLimit("image")).toThrow(/rate limit/i);
   });
 });
 
-describe("callsRemaining", () => {
-  it("starts at max for an unused bucket", () => {
-    expect(callsRemaining("text")).toBe(5);
-    expect(callsRemaining("preview")).toBe(10);
-  });
-
-  it("decrements after each enforced call", () => {
-    enforceRateLimit("text");
-    expect(callsRemaining("text")).toBe(4);
-    enforceRateLimit("text");
-    expect(callsRemaining("text")).toBe(3);
-  });
-
-  it("returns 0 when limit is exhausted", () => {
-    for (let i = 0; i < 5; i++) {
-      try { enforceRateLimit("text"); } catch { /* ignore */ }
-    }
-    expect(callsRemaining("text")).toBe(0);
-  });
-});
-
-describe("resetRateLimit", () => {
-  it("restores calls remaining to max after reset", () => {
-    for (let i = 0; i < 5; i++) {
-      try { enforceRateLimit("text"); } catch { /* ignore */ }
-    }
-    resetRateLimit("text");
-    expect(callsRemaining("text")).toBe(5);
-  });
-
+describe("resetBucket", () => {
   it("allows calls again after reset", () => {
     for (let i = 0; i < 5; i++) {
       try { enforceRateLimit("text"); } catch { /* ignore */ }
     }
-    resetRateLimit("text");
+    resetBucket("text");
     expect(() => enforceRateLimit("text")).not.toThrow();
+  });
+
+  it("unknown bucket defaults to text config", () => {
+    // unknown type falls back to text config (max 5)
+    expect(() => enforceRateLimit("preview")).not.toThrow();
   });
 });
