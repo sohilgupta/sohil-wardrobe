@@ -1,87 +1,36 @@
-/* ─── AI Call Logger ─────────────────────────────────────────────────────────
-   Persists a log of all Gemini API calls in localStorage.
-   Used for usage monitoring and cost tracking.
-
-   Log entry shape:
-     { featureType, tripId, timestamp, promptTokens, resultTokens, tokenCount,
-       cached }
+/* ─── AI Call Logger ──────────────────────────────────────────────────────────
+   Lightweight structured logger for AI calls.
+   Stores a rolling window of the last 50 calls in sessionStorage.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const LOG_KEY  = "wdb_ai_log_v1";
-const MAX_ENTRIES = 200;
+const LOG_KEY    = "vesti_ai_log";
+const MAX_LOGS   = 50;
 
-/** Rough token count: ~4 chars per token (standard estimate). */
-function estimateTokens(text = "") {
-  return Math.ceil(text.length / 4);
-}
-
-/**
- * Record a Gemini API call (or cache hit).
- *
- * @param {{ featureType: string, tripId?: string, prompt?: string,
- *            result?: string, cached?: boolean }} params
- */
-export function logAICall({ featureType, tripId = "trip", prompt = "", result = "", cached = false }) {
+export function logAICall({ featureType, cached = false, prompt = "", result = "" }) {
   try {
-    const raw = localStorage.getItem(LOG_KEY);
-    const log = raw ? JSON.parse(raw) : [];
-    log.push({
+    const existing = JSON.parse(sessionStorage.getItem(LOG_KEY) || "[]");
+    const entry = {
+      ts:          new Date().toISOString(),
       featureType,
-      tripId,
-      timestamp:    new Date().toISOString(),
-      promptTokens: estimateTokens(prompt),
-      resultTokens: estimateTokens(result),
-      tokenCount:   estimateTokens(prompt + result),
       cached,
-    });
-    // Keep only the most recent entries
-    localStorage.setItem(LOG_KEY, JSON.stringify(log.slice(-MAX_ENTRIES)));
-  } catch { /* storage unavailable */ }
+      promptLen:   prompt.length,
+      resultLen:   result.length,
+    };
+    const updated = [entry, ...existing].slice(0, MAX_LOGS);
+    sessionStorage.setItem(LOG_KEY, JSON.stringify(updated));
+
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(`[Vesti AI] ${featureType}${cached ? " (cached)" : ""}`, entry);
+    }
+  } catch {
+    // sessionStorage quota / private mode — silently ignore
+  }
 }
 
-/** Return the full call log. */
-export function getAILog() {
+export function getAILogs() {
   try {
-    const raw = localStorage.getItem(LOG_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-/** Return aggregated usage stats. */
-export function getAIStats() {
-  const log = getAILog();
-  const byFeature = {};
-  let cachedCalls = 0;
-
-  log.forEach(({ featureType: f, tokenCount = 0, cached }) => {
-    if (!byFeature[f]) byFeature[f] = { calls: 0, cachedHits: 0, totalTokens: 0 };
-    byFeature[f].calls++;
-    byFeature[f].totalTokens += tokenCount;
-    if (cached) { byFeature[f].cachedHits++; cachedCalls++; }
-  });
-
-  const totalTokens = log.reduce((s, e) => s + (e.tokenCount || 0), 0);
-  const apiCalls    = log.filter((e) => !e.cached).length;
-
-  // Rough cost estimate: gemini-2.5-flash ~$0.0003 / 1k tokens (blended)
-  const estimatedCostUsd = (totalTokens / 1000) * 0.0003;
-
-  return {
-    totalCalls: log.length,
-    apiCalls,
-    cachedCalls,
-    totalTokens,
-    estimatedCostUsd: +estimatedCostUsd.toFixed(4),
-    byFeature,
-  };
-}
-
-/** Clear the call log. */
-export function clearAILog() {
-  localStorage.removeItem(LOG_KEY);
-}
-
-/** Return the last N entries. */
-export function getRecentCalls(n = 20) {
-  return getAILog().slice(-n);
+    return JSON.parse(sessionStorage.getItem(LOG_KEY) || "[]");
+  } catch {
+    return [];
+  }
 }

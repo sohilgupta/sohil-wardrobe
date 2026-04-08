@@ -1,9 +1,9 @@
 {
   "framework": "vite",
-  "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
-  ],
   "functions": {
-    "api/ai.js": { "maxDuration": 60 }
+    "api/ai.js":              { "maxDuration": 60 },
+    "api/stripe/checkout.js": { "maxDuration": 30 },
+    "api/stripe/webhook.js":  { "maxDuration": 30 },
+    "api/stripe/portal.js":   { "maxDuration": 30 }
   }
 }

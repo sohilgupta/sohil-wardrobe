@@ -1,26 +1,35 @@
 /* ─── useWardrobe hook ──────────────────────────────────────────────────────
-   Single source of truth for wardrobe items.
+   Single source of truth for wardrobe items, scoped per authenticated user.
 
    Data flow:
-     Google Sheets (multi-tab)
+     Google Sheets (multi-tab, optional import)
        → normalized items
-       → localStorage cache  ("wdb_cache_v2")
-       → local overrides     ("wdb_overrides_v2")  ← edits / deletes / additions
+       → localStorage cache  (namespaced by userId)
+       → local overrides     (namespaced by userId)
        → merged items array  ← what components consume
 
-   Polling: re-fetches every POLL_MS ms.  On failure it keeps the last good set.
-   Fallback: if no cache AND fetch fails → seeds from local wardrobe.js so the
-             UI is never completely blank.
+   Freemium:
+     Free tier is limited to MAX_FREE_ITEMS. Attempts to exceed are silently
+     capped — the caller should show a PaywallModal before calling addItem.
+
+   Polling: re-fetches every POLL_MS ms on failure keeps the last good set.
+   Fallback: if no cache AND fetch fails → seeds from local wardrobe.js so
+             the UI is never completely blank.
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { fetchAllTabs } from "../services/SheetSyncService";
 import { enrichWithDriveImages } from "../services/DriveImageService";
 import LOCAL_W from "../data/wardrobe";
+import { useAuth } from "../contexts/AuthContext";
 
-const CACHE_KEY     = "wdb_cache_v3"; // bumped: forces re-fetch with fixed Drive thumbnail URLs
-const OVERRIDES_KEY = "wdb_overrides_v2";
-const POLL_MS       = 5 * 60 * 1000; // 5 min
+export const MAX_FREE_ITEMS = 10;
+
+const POLL_MS = 5 * 60 * 1000; // 5 min
+
+/* ─── Per-user storage keys ─────────────────────────────────────────────── */
+function cacheKey(userId)     { return userId ? `vesti_${userId}_cache_v1`     : "vesti_cache_v1"; }
+function overridesKey(userId) { return userId ? `vesti_${userId}_overrides_v1` : "vesti_overrides_v1"; }
 
 /* ─── localStorage helpers ───────────────────────────────────────────────── */
 const tryParse = (key, fallback) => {
@@ -33,9 +42,11 @@ const trySave = (key, val) => {
 
 const emptyOverrides = () => ({ edits: {}, deletes: [], additions: [] });
 
-function loadOverrides() {
-  const o = tryParse(OVERRIDES_KEY, emptyOverrides());
-  // Defensive normalisation
+function loadOverrides(userId) {
+  // Try namespaced key first, then fall back to legacy key for migration
+  let raw = tryParse(overridesKey(userId), null);
+  if (!raw) raw = tryParse("wdb_overrides_v2", null); // legacy fallback
+  const o = raw || emptyOverrides();
   return {
     edits:     o.edits     || {},
     deletes:   Array.isArray(o.deletes)   ? o.deletes   : [],
@@ -43,11 +54,9 @@ function loadOverrides() {
   };
 }
 
-function saveOverrides(o) { trySave(OVERRIDES_KEY, o); }
+function saveOverrides(userId, o) { trySave(overridesKey(userId), o); }
 
 /* ─── Outfit ID remap: old index-based IDs → new stable IDs ──────────────── */
-// Matches old items to new items by tab name + item name, returns a map of
-// old_id → new_id for any pairs where the ID changed.
 function buildIdRemap(oldItems, newItems) {
   const newByKey = new Map(newItems.map((i) => [`${i._tab}|${i.n}`, i]));
   const remap    = {};
@@ -58,13 +67,10 @@ function buildIdRemap(oldItems, newItems) {
   return remap;
 }
 
-// Scans localStorage outfitIds, replaces any IDs found in remap, bumps
-// updatedAt for affected days so the local version beats a stale backend.
-// Returns true if anything changed (so caller can dispatch an event).
-function applyRemapToOutfitStorage(remap) {
+function applyRemapToOutfitStorage(remap, outfitsKey) {
   if (!Object.keys(remap).length) return false;
   try {
-    const raw = JSON.parse(localStorage.getItem("wdb_outfits_v3"));
+    const raw = JSON.parse(localStorage.getItem(outfitsKey));
     if (!raw?.outfitIds) return false;
 
     const now   = new Date().toISOString();
@@ -84,13 +90,13 @@ function applyRemapToOutfitStorage(remap) {
       newOutfitIds[dayId] = { ...dayData, daytime: newDt, evening: newEv };
       if (JSON.stringify(newDt) !== JSON.stringify(dayData.daytime) ||
           JSON.stringify(newEv) !== JSON.stringify(dayData.evening)) {
-        newUpdatedAt[dayId] = now; // bump so local beats stale backend
+        newUpdatedAt[dayId] = now;
         anyChanged = true;
       }
     });
 
     if (anyChanged) {
-      localStorage.setItem("wdb_outfits_v3", JSON.stringify({ ...raw, outfitIds: newOutfitIds, updatedAt: newUpdatedAt }));
+      localStorage.setItem(outfitsKey, JSON.stringify({ ...raw, outfitIds: newOutfitIds, updatedAt: newUpdatedAt }));
     }
     return anyChanged;
   } catch { return false; }
@@ -105,60 +111,66 @@ function applyOverrides(remoteItems, overrides) {
     .filter((i) => !deleteSet.has(i.id))
     .map((i) => (edits[i.id] ? { ...i, ...edits[i.id] } : i));
 
-  // Local additions that haven't been deleted
   const localAdded = additions.filter((a) => !deleteSet.has(a.id));
-
   return [...base, ...localAdded];
 }
 
 /* ─── Hook ───────────────────────────────────────────────────────────────── */
 export default function useWardrobe() {
+  const { user, session } = useAuth();
+  const userId = user?.id ?? null;
+
   const [items,      setItems]      = useState([]);
   const [loading,    setLoading]    = useState(true);
-  const [syncStatus, setSyncStatus] = useState("idle"); // "syncing"|"ok"|"offline"
+  const [syncStatus, setSyncStatus] = useState("idle");
   const [lastSync,   setLastSync]   = useState(null);
 
-  // Keep a stable ref to current overrides so callbacks don't need to re-read
-  const overridesRef = useRef(loadOverrides());
-  // Track the raw remote items separately so we can re-apply overrides on edits
+  const overridesRef = useRef(loadOverrides(userId));
   const remoteRef    = useRef([]);
 
   /* ── sync: fetch all tabs, update cache & state ── */
   const sync = useCallback(async () => {
     setSyncStatus("syncing");
     try {
-      const fresh = await fetchAllTabs();
+      const fresh = await fetchAllTabs(session?.access_token);
 
-      // Remap outfit IDs in localStorage from old index-based format to new
-      // stable format (matched by tab + item name). Dispatches an event so
-      // useOutfits can reload its state and push corrected IDs to the backend.
+      const outfitsStorageKey = userId ? `vesti_${userId}_outfits_v1` : "vesti_outfits_v1";
       if (remoteRef.current.length) {
         const remap    = buildIdRemap(remoteRef.current, fresh);
-        const migrated = applyRemapToOutfitStorage(remap);
+        const migrated = applyRemapToOutfitStorage(remap, outfitsStorageKey);
         if (migrated) window.dispatchEvent(new Event("wardrobe-outfit-ids-remapped"));
       }
 
       remoteRef.current = fresh;
-      trySave(CACHE_KEY, { items: fresh, fetchedAt: Date.now() });
+      trySave(cacheKey(userId), { items: fresh, fetchedAt: Date.now() });
       const merged = applyOverrides(fresh, overridesRef.current);
       setItems(merged);
       setLastSync(Date.now());
       setSyncStatus("ok");
 
-      // Non-blocking Drive image enrichment — fills in missing images via Claude
-      // Only calls setItems again if new image matches are found
       enrichWithDriveImages(merged, setItems).catch(() => {});
     } catch {
       setSyncStatus("offline");
-      // Keep whatever is already displayed — don't blank the UI
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId, session]);
 
-  /* ── on mount: seed from cache, then fetch fresh data ── */
+  /* ── Re-apply overrides after one-time data migration fires ── */
   useEffect(() => {
-    const cached = tryParse(CACHE_KEY, null);
+    function handleMigration(e) {
+      if (e.detail?.userId !== userId) return;
+      overridesRef.current = loadOverrides(userId);
+      setItems(applyOverrides(remoteRef.current, overridesRef.current));
+    }
+    window.addEventListener("vesti-data-migrated", handleMigration);
+    return () => window.removeEventListener("vesti-data-migrated", handleMigration);
+  }, [userId]);
+
+  /* ── on mount / userId change: seed from cache, then fetch fresh ── */
+  useEffect(() => {
+    overridesRef.current = loadOverrides(userId);
+    const cached = tryParse(cacheKey(userId), null);
 
     if (cached?.items?.length) {
       remoteRef.current = cached.items;
@@ -166,35 +178,43 @@ export default function useWardrobe() {
       setLastSync(cached.fetchedAt);
       setLoading(false);
     } else {
-      // Seed with local wardrobe.js so the UI isn't blank on first load
-      setItems(LOCAL_W);
+      // Try legacy unscoped cache (wdb_cache_v3) before falling back to bundled data
+      const legacyCache = tryParse("wdb_cache_v3", null);
+      if (legacyCache?.items?.length) {
+        remoteRef.current = legacyCache.items;
+        setItems(applyOverrides(legacyCache.items, overridesRef.current));
+        setLastSync(legacyCache.fetchedAt);
+        setLoading(false);
+      } else {
+        setItems(LOCAL_W);
+      }
     }
 
     sync();
     const timer = setInterval(sync, POLL_MS);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [userId]);
 
   /* ─── Mutation helpers ─────────────────────────────────────────────────── */
 
   const editItem = useCallback((id, updates) => {
-    const o = loadOverrides();
+    const o = loadOverrides(userId);
     o.edits[id] = { ...o.edits[id], ...updates };
     overridesRef.current = o;
-    saveOverrides(o);
+    saveOverrides(userId, o);
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
     );
-  }, []);
+  }, [userId]);
 
   const deleteItem = useCallback((id) => {
-    const o = loadOverrides();
+    const o = loadOverrides(userId);
     o.deletes = [...new Set([...o.deletes, id])];
     overridesRef.current = o;
-    saveOverrides(o);
+    saveOverrides(userId, o);
     setItems((prev) => prev.filter((item) => item.id !== id));
-  }, []);
+  }, [userId]);
 
   const addItem = useCallback((item) => {
     const newItem = {
@@ -204,22 +224,23 @@ export default function useWardrobe() {
       t:       item.t ?? "Yes",
       selected: true,
     };
-    const o = loadOverrides();
+    const o = loadOverrides(userId);
     o.additions = [...o.additions, newItem];
     overridesRef.current = o;
-    saveOverrides(o);
+    saveOverrides(userId, o);
     setItems((prev) => [...prev, newItem]);
     return newItem;
-  }, []);
+  }, [userId]);
 
   return {
     items,
     loading,
-    syncStatus,  // "syncing" | "ok" | "offline" | "idle"
+    syncStatus,
     lastSync,
-    sync,        // manual re-sync trigger
+    sync,
     editItem,
     deleteItem,
     addItem,
+    maxFreeItems: MAX_FREE_ITEMS,
   };
 }

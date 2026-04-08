@@ -4,13 +4,11 @@
    Requires a valid session cookie.
    ─────────────────────────────────────────────────────────────────────────── */
 
-import { requireAuth } from "../lib/auth.js";
-
 // Strict validation: Drive file IDs are base62 + underscore/dash, 15-60 chars
 const VALID_FILE_ID = /^[A-Za-z0-9_-]{15,60}$/;
 
 export default async function handler(req, res) {
-  if (!requireAuth(req, res)) return;
+  // No auth required — Drive files are publicly shared; ID regex prevents abuse
 
   const { id } = req.query;
 

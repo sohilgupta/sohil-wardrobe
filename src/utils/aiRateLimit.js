@@ -1,70 +1,54 @@
-/* ─── AI Rate Limiter ────────────────────────────────────────────────────────
-   Session-scoped rate limiting for Gemini API calls.
-   Uses sessionStorage — resets automatically on page reload / new tab.
-
-   Limits (configurable):
-     TEXT features  — 5 calls / 60 s   (outfit gen, capsule, packing)
-     PREVIEW        — 10 calls / 60 s  (image generation is separate quota)
+/* ─── AI Rate Limiter ─────────────────────────────────────────────────────────
+   Client-side token bucket rate limiter.
+   Prevents accidental runaway AI calls in development.
+   Production rate limiting should be enforced server-side.
    ─────────────────────────────────────────────────────────────────────────── */
 
-const KEYS = {
-  text:    "wdb_ai_rate_text",
-  preview: "wdb_ai_rate_preview",
+const BUCKETS = {};
+
+const DEFAULT_CONFIG = {
+  text:  { maxTokens: 5, refillRate: 1, refillIntervalMs: 12_000 }, // 5/min
+  image: { maxTokens: 2, refillRate: 1, refillIntervalMs: 30_000 }, // 2/min
 };
 
-const LIMITS = {
-  text:    { max: 5,  windowMs: 60_000 },
-  preview: { max: 10, windowMs: 60_000 },
-};
-
-function getHistory(bucket) {
-  try {
-    const raw = sessionStorage.getItem(KEYS[bucket]);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
-}
-
-function setHistory(bucket, history) {
-  try {
-    sessionStorage.setItem(KEYS[bucket], JSON.stringify(history));
-  } catch { /* unavailable — skip rate limiting */ }
-}
-
-/**
- * Check & record an AI call. Throws if rate limit exceeded.
- * @param {"text"|"preview"} [bucket="text"]
- */
-export function enforceRateLimit(bucket = "text") {
-  const { max, windowMs } = LIMITS[bucket] ?? LIMITS.text;
-  const now = Date.now();
-  const history = getHistory(bucket).filter((t) => now - t < windowMs);
-  if (history.length >= max) {
-    const waitSecs = Math.ceil((windowMs - (now - history[0])) / 1000);
-    throw new Error(
-      `AI rate limit reached (${max} calls/min). Please wait ${waitSecs}s before trying again.`
-    );
+function getBucket(type) {
+  if (!BUCKETS[type]) {
+    const cfg = DEFAULT_CONFIG[type] || DEFAULT_CONFIG.text;
+    BUCKETS[type] = {
+      tokens:     cfg.maxTokens,
+      lastRefill: Date.now(),
+      cfg,
+    };
   }
-  history.push(now);
-  setHistory(bucket, history);
+  return BUCKETS[type];
 }
 
-/**
- * How many calls remain in the current window.
- * @param {"text"|"preview"} [bucket="text"]
- */
-export function callsRemaining(bucket = "text") {
-  const { max, windowMs } = LIMITS[bucket] ?? LIMITS.text;
-  const now = Date.now();
-  const recent = getHistory(bucket).filter((t) => now - t < windowMs);
-  return Math.max(0, max - recent.length);
+/* ── Enforce rate limit — throws if bucket is empty ────────────────────── */
+export function enforceRateLimit(type = "text") {
+  const bucket = getBucket(type);
+  const now    = Date.now();
+  const elapsed = now - bucket.lastRefill;
+  const refills = Math.floor(elapsed / bucket.cfg.refillIntervalMs);
+
+  if (refills > 0) {
+    bucket.tokens = Math.min(
+      bucket.cfg.maxTokens,
+      bucket.tokens + refills * bucket.cfg.refillRate
+    );
+    bucket.lastRefill = now - (elapsed % bucket.cfg.refillIntervalMs);
+  }
+
+  if (bucket.tokens <= 0) {
+    const waitSec = Math.ceil(
+      (bucket.cfg.refillIntervalMs - (now - bucket.lastRefill)) / 1000
+    );
+    throw new Error(`Rate limit hit — please wait ${waitSec}s before retrying.`);
+  }
+
+  bucket.tokens--;
 }
 
-/**
- * Reset a bucket's history (e.g. for testing).
- * @param {"text"|"preview"} [bucket="text"]
- */
-export function resetRateLimit(bucket = "text") {
-  try {
-    sessionStorage.removeItem(KEYS[bucket]);
-  } catch { /* unavailable */ }
+/* ── Reset bucket (e.g. in tests) ──────────────────────────────────────── */
+export function resetBucket(type = "text") {
+  delete BUCKETS[type];
 }

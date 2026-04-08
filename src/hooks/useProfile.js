@@ -1,131 +1,80 @@
-/* ─── useProfile — Reference photo management ────────────────────────────────
-   Stores up to 5 compressed reference photos in localStorage.
-   Photos are compressed client-side to ≤ 768px / JPEG 82% before storing,
-   keeping each photo under ~250KB.
+/* ─── useProfile hook ─────────────────────────────────────────────────────────
+   Manages profile reference photos used for outfit preview generation.
+   Photos are stored as data URLs in localStorage, namespaced per user.
 
-   Cross-device sync via /api/profile (Upstash KV). Gracefully falls back to
-   localStorage-only if the backend returns 503 (not configured).
-
-   Storage key: wdb_profile_photos_v1  (array of base64 data URIs)
+   API:
+   - photos[]       — array of { id, dataUrl, addedAt }
+   - addPhoto(file) — add a photo (max MAX_PHOTOS)
+   - removePhoto(id)— remove by ID
+   - clearAll()     — remove all photos
+   - MAX_PHOTOS     — 3 (free tier limit)
    ─────────────────────────────────────────────────────────────────────────── */
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback } from "react";
+import { useUser } from "../contexts/AuthContext";
 
-const STORAGE_KEY = "wdb_profile_photos_v1";
-const MAX_PHOTOS  = 5;
-const MAX_DIM     = 768;
-const JPEG_Q      = 0.82;
+export const MAX_PHOTOS = 3;
 
-/* ── Compress an image File → base64 JPEG data URI ── */
-function compressPhoto(file) {
-  return new Promise((resolve) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const ratio  = Math.min(MAX_DIM / img.width, MAX_DIM / img.height, 1);
-      const canvas = document.createElement("canvas");
-      canvas.width  = Math.round(img.width  * ratio);
-      canvas.height = Math.round(img.height * ratio);
-      canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", JPEG_Q));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-    img.src = url;
-  });
+function getStorageKey(userId) {
+  return userId ? `vesti_${userId}_profile_photos` : "vesti_profile_photos";
 }
 
-function loadPhotos() {
+function loadPhotos(userId) {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const raw = localStorage.getItem(getStorageKey(userId));
+    return Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function savePhotos(photos) {
+function savePhotos(userId, photos) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(photos));
-  } catch {
-    // localStorage full — drop oldest until it fits
-    const trimmed = photos.slice(1);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(trimmed)); } catch { /* ignore */ }
-  }
+    localStorage.setItem(getStorageKey(userId), JSON.stringify(photos));
+  } catch { /* quota */ }
 }
-
-/* ── Backend sync helpers ─────────────────────────────────────────────────── */
-
-async function fetchFromBackend() {
-  try {
-    const res = await fetch("/api/profile");
-    if (!res.ok) return null;               // 401, 503, etc. — fall through to local
-    const data = await res.json();
-    return Array.isArray(data.photos) ? data.photos : null;
-  } catch {
-    return null;
-  }
-}
-
-function pushToBackend(photos) {
-  fetch("/api/profile", {
-    method:  "POST",
-    headers: { "Content-Type": "application/json" },
-    body:    JSON.stringify({ photos }),
-  }).catch(() => {}); // silently fail if backend unavailable
-}
-
-/* ── Hook ─────────────────────────────────────────────────────────────────── */
 
 export default function useProfile() {
-  const [photos, setPhotos] = useState(loadPhotos);
-  const syncTimer = useRef(null);
+  const user = useUser();
+  const userId = user?.id ?? null;
 
-  // Debounced backend push (300ms)
-  const scheduleSync = useCallback((nextPhotos) => {
-    if (syncTimer.current) clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(() => pushToBackend(nextPhotos), 300);
-  }, []);
+  const [photos, setPhotos] = useState(() => loadPhotos(userId));
 
-  // On mount: fetch from backend and merge (backend wins on conflict)
-  useEffect(() => {
-    fetchFromBackend().then((remote) => {
-      if (!remote) return;                  // backend not configured or offline
-      setPhotos((local) => {
-        // Use whichever set has more photos (simple merge strategy)
-        const merged = remote.length >= local.length ? remote : local;
-        savePhotos(merged);
-        return merged;
+  const addPhoto = useCallback(
+    (file) => {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPhotos((prev) => {
+          if (prev.length >= MAX_PHOTOS) return prev;
+          const next = [
+            ...prev,
+            { id: `photo_${Date.now()}`, dataUrl: e.target.result, addedAt: Date.now() },
+          ];
+          savePhotos(userId, next);
+          return next;
+        });
+      };
+      reader.readAsDataURL(file);
+    },
+    [userId]
+  );
+
+  const removePhoto = useCallback(
+    (id) => {
+      setPhotos((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        savePhotos(userId, next);
+        return next;
       });
-    });
-  }, []);
-
-  const addPhoto = useCallback(async (file) => {
-    if (!file) return;
-    const dataUrl = await compressPhoto(file);
-    if (!dataUrl) return;
-    setPhotos((prev) => {
-      const next = [...prev, dataUrl].slice(-MAX_PHOTOS);
-      savePhotos(next);
-      scheduleSync(next);
-      return next;
-    });
-  }, [scheduleSync]);
-
-  const removePhoto = useCallback((index) => {
-    setPhotos((prev) => {
-      const next = prev.filter((_, i) => i !== index);
-      savePhotos(next);
-      scheduleSync(next);
-      return next;
-    });
-  }, [scheduleSync]);
+    },
+    [userId]
+  );
 
   const clearAll = useCallback(() => {
-    try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
     setPhotos([]);
-    scheduleSync([]);
-  }, [scheduleSync]);
+    savePhotos(userId, []);
+  }, [userId]);
 
   return { photos, addPhoto, removePhoto, clearAll, MAX_PHOTOS };
 }

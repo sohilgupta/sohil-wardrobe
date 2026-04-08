@@ -263,8 +263,9 @@ function normalizeTab(tabName, gvizData) {
 }
 
 /* ─── Public: fetch all tabs via server-side proxy ───────────────────────── */
-export async function fetchAllTabs() {
-  const res = await fetch("/api/wardrobe");
+export async function fetchAllTabs(accessToken) {
+  const headers = accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
+  const res = await fetch("/api/wardrobe", { headers });
 
   if (!res.ok) {
     if (res.status === 401) throw new Error("Not authenticated");
