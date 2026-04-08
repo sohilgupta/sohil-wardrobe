@@ -26,6 +26,10 @@ import OutfitCard from "./OutfitCard";
 import ItemPicker from "./ItemPicker";
 import Chip from "./Chip";
 import { computeUsageStats } from "./ItemPicker";
+import usePreview, { buildPreviewKey } from "../hooks/usePreview";
+import OutfitPreviewModal from "./OutfitPreviewModal";
+import ExportModal from "./ExportModal";
+import DayExportModal from "./DayExportModal";
 
 /* ─── Slot configs ────────────────────────────────────────────────────────── */
 const SLOT_CONFIGS = {
@@ -183,6 +187,8 @@ function SlotSection({
   isFrozen, isLoading,
   onPick, onRegenerate, onRemoveLayer, onAddLayer,
   usageStats,       // { [itemId]: { count, ... } } — for ×N used badges on OutfitCard
+  onPreview,        // () => void | null — opens preview modal for this slot
+  hasPreview,       // bool — preview image already cached
 }) {
   const midActive           = optionalLayers.includes("mid")           && !!(slotIds?.mid           && slotIds.mid           !== "REMOVED");
   const outerActive         = optionalLayers.includes("outer")         && !!(slotIds?.outer         && slotIds.outer         !== "REMOVED");
@@ -205,6 +211,25 @@ function SlotSection({
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Preview Me Here button */}
+          {onPreview && hasOutfit && !isLoading && (
+            <button
+              onClick={onPreview}
+              title="Generate travel preview photo"
+              style={{
+                background: hasPreview ? "rgba(15,52,96,0.3)" : "none",
+                border: `1px solid ${hasPreview ? "#60A5FA" : T.borderLight}`,
+                borderRadius: 20, padding: "2px 9px",
+                fontSize: 10, color: hasPreview ? "#93C5FD" : T.light, cursor: "pointer",
+                fontFamily: "inherit", letterSpacing: 0.5,
+                display: "flex", alignItems: "center", gap: 4,
+                transition: "all 0.15s",
+              }}
+            >
+              <span style={{ fontSize: 9 }}>📸</span>
+              <span style={{ fontSize: 9 }}>{hasPreview ? "PREVIEW" : "PREVIEW ME"}</span>
+            </button>
+          )}
           {/* Per-slot local regenerate button */}
           {!isFrozen && hasOutfit && !isLoading && (
             <button
@@ -312,7 +337,9 @@ export default function OutfitsTab({
   toggleFreeze,
   focusDayId = null,
   onFocusConsumed,
-  capsuleIds,   // Set<itemId> — from useCapsule, passed through for picker + AI gen
+  capsuleIds,             // Set<itemId> — from useCapsule, passed through for picker + AI gen
+  profilePhotos = [],     // string[] base64 data URIs — from useProfile in App.jsx
+  onNavigateToProfile,    // () => void — navigate to Profile tab
 }) {
   const [selectedDay, setSelectedDay] = useState(TRIP[0]);
   const [aiLoading,   setAiLoading]   = useState(false);
@@ -322,6 +349,23 @@ export default function OutfitsTab({
   const [slotLoading, setSlotLoading] = useState(null);
   // { slot, layer } | null — picker target
   const [pickerLayer, setPickerLayer] = useState(null);
+  // Preview modal target: { dayId, slot, slotLabel } | null
+  const [previewTarget, setPreviewTarget] = useState(null);
+  // Trip export modal open
+  const [showExport, setShowExport] = useState(false);
+  // Day export modal open
+  const [showDayExport, setShowDayExport] = useState(false);
+
+  // Preview hook
+  const {
+    getPreview,
+    getPreviewData,
+    setPreview,
+    clearPreview,
+    generatePreview,
+    isGenerating: isPreviewGenerating,
+    cache: previewCache,
+  } = usePreview();
 
   const isMobile = useIsMobile();
 
@@ -559,6 +603,25 @@ export default function OutfitsTab({
         )}
       </div>
 
+      {/* ── Action row: AI Generate + Export ── */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button
+          onClick={() => setShowExport(true)}
+          title="Export outfits"
+          style={{
+            padding: "13px 14px", borderRadius: 14,
+            border: `1.5px solid ${T.border}`,
+            background: "none", color: T.mid,
+            fontSize: 12, fontWeight: 700, letterSpacing: 0.3,
+            cursor: "pointer", fontFamily: "inherit",
+            display: "flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+            flexShrink: 0,
+          }}
+        >
+          ⬇ Export
+        </button>
+      </div>
+
       {/* ── AI Generate Button ── */}
       <div style={{ marginBottom: 16 }}>
         <button
@@ -726,6 +789,23 @@ export default function OutfitsTab({
                     }}>
                       {selectedDay.id.replace("d", "")}
                     </div>
+                    {/* Export Day button */}
+                    <button
+                      onClick={() => setShowDayExport(true)}
+                      title="Export this day's outfits"
+                      style={{
+                        padding: "4px 9px", borderRadius: 20,
+                        fontSize: 9, fontWeight: 700, letterSpacing: 1,
+                        cursor: "pointer", fontFamily: "inherit",
+                        transition: "all 0.15s",
+                        border: `1.5px solid ${T.borderLight}`,
+                        background: "none",
+                        color: T.light,
+                        display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
+                      }}
+                    >
+                      ⬇ EXPORT
+                    </button>
                     {/* Freeze toggle */}
                     <button
                       onClick={() => toggleFreeze(selectedDay.id)}
@@ -780,6 +860,8 @@ export default function OutfitsTab({
                   onRemoveLayer={(layer) => handleRemoveLayer("daytime", layer)}
                   onAddLayer={(layer) => handleAddLayer("daytime", layer)}
                   usageStats={usageStats}
+                  onPreview={dtIds ? () => setPreviewTarget({ dayId: selectedDay.id, slot: "daytime", slotLabel: "DAYTIME" }) : null}
+                  hasPreview={!!(dtIds && getPreview(buildPreviewKey(selectedDay.id, "daytime", dtIds)))}
                 />
 
                 {/* ── Divider ── */}
@@ -802,6 +884,8 @@ export default function OutfitsTab({
                   onRemoveLayer={(layer) => handleRemoveLayer("evening", layer)}
                   onAddLayer={(layer) => handleAddLayer("evening", layer)}
                   usageStats={usageStats}
+                  onPreview={evIds ? () => setPreviewTarget({ dayId: selectedDay.id, slot: "evening", slotLabel: "EVENING" }) : null}
+                  hasPreview={!!(evIds && getPreview(buildPreviewKey(selectedDay.id, "evening", evIds)))}
                 />
 
                 {/* ── Optional occasion slots ── */}
@@ -810,6 +894,7 @@ export default function OutfitsTab({
                   // null or undefined = disabled; don't render
                   if (slotRawData === null || slotRawData === undefined) return null;
                   const cfg = SLOT_CONFIGS[slot];
+                  const optPreviewKey = buildPreviewKey(selectedDay.id, slot, slotRawData);
                   return (
                     <div key={slot}>
                       <div style={{ height: 1, background: T.borderLight, margin: "18px 0" }} />
@@ -829,6 +914,8 @@ export default function OutfitsTab({
                         onRemoveLayer={(layer) => handleRemoveLayer(slot, layer)}
                         onAddLayer={(layer) => handleAddLayer(slot, layer)}
                         usageStats={usageStats}
+                        onPreview={() => setPreviewTarget({ dayId: selectedDay.id, slot, slotLabel: cfg.label })}
+                        hasPreview={!!getPreview(optPreviewKey)}
                       />
                     </div>
                   );
@@ -909,6 +996,71 @@ export default function OutfitsTab({
           dayOcc={selectedDay?.occ}
           onSelect={handlePickerSelect}
           onClose={() => setPickerLayer(null)}
+        />
+      )}
+
+      {/* ── Outfit Preview modal ── */}
+      {previewTarget && (() => {
+        const { dayId, slot, slotLabel } = previewTarget;
+        const day      = TRIP.find((d) => d.id === dayId);
+        const slotIds  = outfitIds[dayId]?.[slot] || null;
+        const pKey     = slotIds ? buildPreviewKey(dayId, slot, slotIds) : null;
+        const location = day ? day.city.split("→")[0].trim() : "";
+        const activity = slot === "evening" ? day?.night : day?.day;
+        return (
+          <OutfitPreviewModal
+            day={day}
+            slot={slot}
+            slotLabel={slotLabel}
+            slotIds={slotIds}
+            wardrobe={wardrobe}
+            imageUrl={pKey ? getPreview(pKey) : null}
+            usedFaceRef={pKey ? (getPreviewData(pKey)?.faceRef ?? null) : null}
+            isGenerating={pKey ? isPreviewGenerating(pKey) : false}
+            profilePhotos={profilePhotos}
+            onNavigateToProfile={() => { setPreviewTarget(null); onNavigateToProfile?.(); }}
+            onGenerate={async () => {
+              if (!pKey || !slotIds) return;
+              await generatePreview({
+                key: pKey, location, activity,
+                weather: day?.w, slotIds, wardrobe,
+                referencePhotos: profilePhotos,
+              });
+            }}
+            onRegenerate={async () => {
+              if (!pKey || !slotIds) return;
+              clearPreview(pKey);
+              await generatePreview({
+                key: pKey, location, activity,
+                weather: day?.w, slotIds, wardrobe,
+                referencePhotos: profilePhotos,
+              });
+            }}
+            onClose={() => setPreviewTarget(null)}
+          />
+        );
+      })()}
+
+      {/* ── Export modal ── */}
+      {showExport && (
+        <ExportModal
+          outfitIds={outfitIds}
+          frozenDays={frozenDays}
+          wardrobe={wardrobe}
+          previewCache={previewCache}
+          buildPreviewKey={buildPreviewKey}
+          onClose={() => setShowExport(false)}
+        />
+      )}
+
+      {/* ── Day Export modal ── */}
+      {showDayExport && selectedDay && (
+        <DayExportModal
+          day={selectedDay}
+          dayData={outfitIds[selectedDay.id] || null}
+          wardrobe={wardrobe}
+          previewCache={previewCache}
+          onClose={() => setShowDayExport(false)}
         />
       )}
     </div>
