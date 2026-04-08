@@ -132,6 +132,10 @@ function AuthenticatedApp({ onLogout }) {
         body{background:${T.bg};color:${T.text};}
         ::placeholder{color:${T.light};}
         @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+        .nav-tab{transition:background 0.15s;}
+        .nav-tab:hover{background:rgba(232,230,225,0.04);}
+        .wardrobe-card{transition:transform 0.18s ease,box-shadow 0.18s ease;border-radius:14px;}
+        .wardrobe-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.45);}
       `}</style>
 
       {/* Header */}
@@ -236,10 +240,11 @@ function AuthenticatedApp({ onLogout }) {
               <button
                 key={n.id}
                 onClick={() => setTab(n.id)}
+                className="nav-tab"
                 style={{
                   flex: 1,
                   padding: "9px 0 10px",
-                  background: "none",
+                  background: tab === n.id ? "rgba(232,230,225,0.06)" : "none",
                   border: "none",
                   cursor: "pointer",
                   display: "flex",
@@ -249,6 +254,19 @@ function AuthenticatedApp({ onLogout }) {
                   position: "relative",
                 }}
               >
+                {tab === n.id && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: "20%",
+                      right: "20%",
+                      height: 2,
+                      background: T.text,
+                      borderRadius: "0 0 2px 2px",
+                    }}
+                  />
+                )}
                 <span style={{ fontSize: 13, color: tab === n.id ? T.text : T.light }}>{n.icon}</span>
                 <span
                   style={{
@@ -260,19 +278,6 @@ function AuthenticatedApp({ onLogout }) {
                 >
                   {n.label}
                 </span>
-                {tab === n.id && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: "15%",
-                      right: "15%",
-                      height: 2,
-                      background: T.text,
-                      borderRadius: 2,
-                    }}
-                  />
-                )}
               </button>
             ))}
           </div>

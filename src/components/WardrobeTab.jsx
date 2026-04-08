@@ -303,7 +303,7 @@ export default function WardrobeTab({
                       <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
                         {detail.price && (
                           <span style={{ fontSize: 11, color: "#4ADE80", fontWeight: 700 }}>
-                            {detail.price}
+                            ₹{Number(detail.price).toLocaleString("en-IN")}
                           </span>
                         )}
                         {detail.purchaseDate && (
@@ -412,7 +412,7 @@ export default function WardrobeTab({
       {/* ── Grid ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 16 }}>
         {f.map((item) => (
-          <div key={item.id} onClick={() => openDetail(item)} style={{ cursor: "pointer" }}>
+          <div key={item.id} onClick={() => openDetail(item)} className="wardrobe-card" style={{ cursor: "pointer" }}>
             <div style={{ position: "relative" }}>
               <ItemVisual item={item} size={148} />
               {item.t === "Yes" && (
@@ -451,7 +451,9 @@ export default function WardrobeTab({
                 <Chip text={item.col || item.color} />
                 <Chip text={item.w} colors={T.weather[item.w]} />
                 {item.price && (
-                  <span style={{ fontSize: 9, color: "#4ADE80", fontWeight: 700 }}>{item.price}</span>
+                  <span style={{ fontSize: 9, color: "#4ADE80", fontWeight: 700 }}>
+                    ₹{Number(item.price).toLocaleString("en-IN")}
+                  </span>
                 )}
               </div>
             </div>

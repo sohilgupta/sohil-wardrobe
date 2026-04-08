@@ -67,7 +67,7 @@ export default function AuthPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: T.bg,
+        background: `radial-gradient(ellipse 80% 60% at 50% 0%, #1e1a2e 0%, ${T.bg} 60%)`,
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -75,34 +75,60 @@ export default function AuthPage() {
         fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
         color: T.text,
         padding: "20px",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         body{background:${T.bg};}
         ::placeholder{color:${T.light};}
         input:focus{border-color:${T.mid} !important;outline:none;}
-        .auth-btn{transition:background 0.15s,opacity 0.15s;}
-        .auth-btn:hover:not(:disabled){opacity:0.88;}
+        .auth-btn{transition:all 0.2s ease;}
+        .auth-btn:hover:not(:disabled){opacity:0.88;transform:translateY(-1px);}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+        .auth-card{animation:fadeUp 0.5s ease forwards;}
       `}</style>
 
+      {/* Grain texture overlay */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E")`,
+        backgroundRepeat: "repeat", backgroundSize: "128px",
+      }} />
+
+      {/* Decorative top accent line */}
+      <div style={{
+        position: "absolute", top: 0, left: "30%", right: "30%", height: 1,
+        background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.3), transparent)",
+        zIndex: 1,
+      }} />
+
       <div
+        className="auth-card"
         style={{
-          background: T.surface,
-          border: `1px solid ${T.border}`,
-          borderRadius: 16,
-          padding: "44px 40px",
+          position: "relative", zIndex: 2,
+          background: "rgba(26,26,31,0.85)",
+          backdropFilter: "blur(12px)",
+          border: `1px solid rgba(255,255,255,0.07)`,
+          borderRadius: 20,
+          padding: "48px 40px",
           width: "100%",
           maxWidth: 380,
+          boxShadow: "0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
         }}
       >
         {/* Wordmark */}
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <p style={LOGO_STYLE}>Vesti</p>
-          <p style={{ fontSize: 11, color: T.light, letterSpacing: 2, marginTop: 6, fontWeight: 500 }}>
-            AI WARDROBE PLANNER
-          </p>
+        <div style={{ textAlign: "center", marginBottom: 44 }}>
+          <p style={{ ...LOGO_STYLE, fontStyle: "italic", fontSize: 42, letterSpacing: -1.5 }}>Vesti</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", marginTop: 10 }}>
+            <div style={{ height: "0.5px", width: 28, background: T.light, opacity: 0.4 }} />
+            <p style={{ fontSize: 9, color: T.light, letterSpacing: 3, fontWeight: 500, opacity: 0.7 }}>
+              AI WARDROBE PLANNER
+            </p>
+            <div style={{ height: "0.5px", width: 28, background: T.light, opacity: 0.4 }} />
+          </div>
         </div>
 
         {/* Dev-mode setup notice */}
