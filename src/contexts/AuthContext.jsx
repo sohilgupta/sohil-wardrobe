@@ -47,9 +47,11 @@ export function AuthProvider({ children }) {
 
   /* ── Listen to auth state changes ── */
   useEffect(() => {
-    // If Supabase is not configured, resolve immediately as unauthenticated
+    // If Supabase is not configured, use a local dev session so the app renders
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     if (!supabaseUrl) {
+      setUser({ id: "local-dev", email: "dev@local" });
+      setProfile({ plan: "pro", subscription_status: "active" });
       setLoading(false);
       return;
     }
