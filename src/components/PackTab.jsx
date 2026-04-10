@@ -177,6 +177,19 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
 
   return (
     <div>
+      {/* ── Apple Marketing Hero ── */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
+          Packing List
+        </p>
+        <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
+          Pack Smart.
+        </p>
+        <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
+          From your frozen outfits + capsule
+        </p>
+      </div>
+
       {/* ── Header ── */}
       <div style={{
         background: T.surface,
@@ -396,9 +409,12 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
       {/* ── Items by layer ── */}
       {LAYER_ORDER.filter((l) => groups[l]).map((layer) => (
         <div key={layer} style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: 11, fontWeight: 700, color: T.light, letterSpacing: 1.5, marginBottom: 10 }}>
-            {LAYER_ICON[layer]} {LAYER_LABEL[layer].toUpperCase()} ({groups[layer].length})
-          </p>
+          <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, marginTop: 24 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.mid }}>
+              {LAYER_ICON[layer]} {LAYER_LABEL[layer]}
+            </p>
+            <p style={{ fontSize: 11, color: T.light }}>{groups[layer].length} items</p>
+          </div>
           {groups[layer].map((item) => {
             const [bg, ac] = swatch(item.col);
             const isPacked = checked[item.id];
@@ -410,11 +426,11 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
                   display: "flex",
                   alignItems: "center",
                   gap: 12,
-                  background: isPacked ? T.alt : T.surface,
-                  border: `1.5px solid ${T.borderLight}`,
+                  background: T.surface,
+                  border: `1px solid ${T.borderLight}`,
                   borderRadius: 12,
-                  padding: "10px 14px",
-                  marginBottom: 8,
+                  padding: "11px 14px",
+                  marginBottom: 6,
                   cursor: "pointer",
                   opacity: isPacked ? 0.55 : 1,
                   transition: "all 0.15s",
@@ -445,9 +461,11 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
                 {/* Item info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{
-                    fontSize: 13,
-                    fontWeight: 600,
+                    flex: 1,
+                    fontSize: 14,
+                    fontWeight: 500,
                     color: T.text,
+                    letterSpacing: -0.1,
                     textDecoration: isPacked ? "line-through" : "none",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -462,16 +480,14 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
 
                 {/* Usage count badge */}
                 <div style={{
-                  flexShrink: 0,
-                  fontSize: 9,
+                  fontSize: 11,
                   fontWeight: 700,
-                  color: T.light,
-                  letterSpacing: 0.5,
-                  background: T.alt,
-                  border: `1px solid ${T.borderLight}`,
+                  color: T.accent,
+                  background: T.accentDim,
+                  border: `1px solid ${T.accentBorder}`,
                   borderRadius: 20,
                   padding: "2px 8px",
-                  whiteSpace: "nowrap",
+                  flexShrink: 0,
                 }}>
                   ×{item._useCount}
                 </div>
@@ -512,9 +528,12 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
           </div>
           {LAYER_ORDER.filter((l) => capsuleOnlyGroups[l]).map((layer) => (
             <div key={layer} style={{ marginBottom: 16 }}>
-              <p style={{ fontSize: 10, fontWeight: 700, color: T.light, letterSpacing: 1.5, marginBottom: 8 }}>
-                {LAYER_ICON[layer]} {LAYER_LABEL[layer].toUpperCase()} ({capsuleOnlyGroups[layer].length})
-              </p>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 10, marginTop: 24 }}>
+                <p style={{ fontSize: 12, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: T.mid }}>
+                  {LAYER_ICON[layer]} {LAYER_LABEL[layer]}
+                </p>
+                <p style={{ fontSize: 11, color: T.light }}>{capsuleOnlyGroups[layer].length} items</p>
+              </div>
               {capsuleOnlyGroups[layer].map((item) => {
                 const [bg, ac] = swatch(item.col);
                 const isPacked = checked[item.id];
@@ -526,11 +545,11 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
                       display: "flex",
                       alignItems: "center",
                       gap: 12,
-                      background: isPacked ? T.alt : T.surface,
-                      border: `1.5px solid ${isPacked ? T.borderLight : "#0D2E2B"}`,
+                      background: T.surface,
+                      border: `1px solid ${T.borderLight}`,
                       borderRadius: 12,
-                      padding: "10px 14px",
-                      marginBottom: 8,
+                      padding: "11px 14px",
+                      marginBottom: 6,
                       cursor: "pointer",
                       opacity: isPacked ? 0.55 : 1,
                       transition: "all 0.15s",
@@ -551,7 +570,11 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
                     {/* Item info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <p style={{
-                        fontSize: 13, fontWeight: 600, color: T.text,
+                        flex: 1,
+                        fontSize: 14,
+                        fontWeight: 500,
+                        color: T.text,
+                        letterSpacing: -0.1,
                         textDecoration: isPacked ? "line-through" : "none",
                         overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       }}>
