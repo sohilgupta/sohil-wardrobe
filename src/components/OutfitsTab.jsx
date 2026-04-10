@@ -96,20 +96,17 @@ function DayRow({ day, active, hasOutfit, hasMissing, isFrozen, onClick }) {
       onClick={onClick}
       style={{
         width: "100%", textAlign: "left",
-        background: active ? T.alt : "none",
-        border: `1.5px solid ${active ? T.border : "transparent"}`,
+        background: active ? T.accentDim : T.surface,
+        border: `1px solid ${active ? T.accentBorder : T.borderLight}`,
         borderRadius: 12, padding: "10px 12px",
         cursor: "pointer", transition: "background 0.15s",
         position: "relative",
       }}
     >
-      {active && (
-        <div style={{ position: "absolute", left: 0, top: "20%", bottom: "20%", width: 3, background: T.text, borderRadius: 4 }} />
-      )}
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 16, lineHeight: 1 }}>{day.e}</span>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: active ? T.text : T.mid, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          <div style={{ fontSize: 13, fontWeight: active ? 700 : 600, color: active ? T.accent : T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: -0.2 }}>
             {day.city.split("→")[0].trim()}
           </div>
           <div style={{ fontSize: 9, color: T.light, marginTop: 1 }}>{day.date}</div>
@@ -135,15 +132,15 @@ function DayChip({ day, active, hasOutfit, hasMissing, isFrozen, onClick }) {
       onClick={onClick}
       style={{
         flexShrink: 0,
-        background: active ? T.alt : "transparent",
-        border: `1.5px solid ${active ? T.border : T.borderLight}`,
-        borderRadius: 12, padding: "8px 10px",
+        background: active ? T.accentDim : T.surface,
+        border: `1px solid ${active ? T.accentBorder : T.borderLight}`,
+        borderRadius: 12, padding: "10px 12px",
         cursor: "pointer", textAlign: "center",
         minWidth: 52, transition: "background 0.15s",
       }}
     >
       <div style={{ fontSize: 15, lineHeight: 1 }}>{day.e}</div>
-      <div style={{ fontSize: 8, fontWeight: 700, color: active ? T.text : T.light, marginTop: 3, letterSpacing: 0.5 }}>
+      <div style={{ fontSize: 8, fontWeight: active ? 700 : 600, color: active ? T.accent : T.text, marginTop: 3, letterSpacing: -0.2 }}>
         {day.id.replace("d", "D")}
       </div>
       <div style={{
@@ -201,13 +198,23 @@ function SlotSection({
       {/* Slot label row */}
       <div style={{
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        marginBottom: 10,
+        marginBottom: 0,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: T.mid,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          marginBottom: 12,
+        }}>
           <span style={{ fontSize: 13 }}>{icon}</span>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: T.light }}>{label}</span>
+          <span>{label}</span>
           {activity && (
-            <span style={{ fontSize: 10, color: T.mid }}>· {activity}</span>
+            <span style={{ fontSize: 10, color: T.mid, textTransform: "none", letterSpacing: 0 }}>· {activity}</span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -587,6 +594,19 @@ export default function OutfitsTab({
 
   return (
     <div>
+      {/* ── Apple Marketing Hero ── */}
+      <div style={{ marginBottom: 24 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
+          Daily Planning
+        </p>
+        <p style={{ fontSize: 28, fontWeight: 800, letterSpacing: -0.7, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
+          {TRIP.length}-Day Trip.
+        </p>
+        <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
+          {Object.values(outfitIds).filter(d => d?.daytime || d?.evening).length} days planned
+        </p>
+      </div>
+
       {/* ── Header ── */}
       <div style={{ marginBottom: 16 }}>
         <h2 style={{ fontFamily: "'Cormorant Garamond',serif", fontSize: 22, fontWeight: 700, color: T.text, letterSpacing: -0.3, marginBottom: 4 }}>
@@ -629,22 +649,17 @@ export default function OutfitsTab({
           disabled={aiLoading || wardrobe.length === 0}
           style={{
             width: "100%",
-            padding: "13px 20px",
-            borderRadius: 14,
+            background: aiLoading ? T.alt : aiDone ? "#0C2010" : T.accentDim,
             border: aiLoading
-              ? `1.5px solid ${T.border}`
+              ? `1px solid ${T.border}`
               : aiDone
-                ? `1.5px solid #4ADE80`
-                : "1.5px solid transparent",
-            background: aiLoading
-              ? T.alt
-              : aiDone
-                ? "#0C2010"
-                : "linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)",
-            color: aiLoading ? T.light : aiDone ? "#4ADE80" : T.text,
+                ? `1px solid #4ADE80`
+                : `1px solid ${T.accentBorder}`,
+            borderRadius: 12,
+            color: aiLoading ? T.light : aiDone ? "#4ADE80" : T.accent,
             fontSize: 13,
             fontWeight: 700,
-            letterSpacing: 0.5,
+            padding: "11px 18px",
             cursor: aiLoading || wardrobe.length === 0 ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             display: "flex",
@@ -652,7 +667,6 @@ export default function OutfitsTab({
             justifyContent: "center",
             gap: 8,
             transition: "all 0.2s",
-            boxShadow: aiLoading || aiDone ? "none" : "0 4px 20px rgba(15,52,96,0.4)",
           }}
         >
           {aiLoading ? (

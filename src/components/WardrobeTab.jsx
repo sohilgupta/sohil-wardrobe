@@ -186,12 +186,36 @@ export default function WardrobeTab({
 
   return (
     <div>
+      {/* ── Apple Marketing Hero ── */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
+          Your Collection
+        </p>
+        <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
+          {wardrobe.length} Pieces.
+        </p>
+        <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
+          {wardrobe.filter(i => i.t === "Yes").length} travel-ready · {[...new Set(wardrobe.map(i => i.c))].length} categories
+        </p>
+      </div>
+
       {/* ── Search + sync ── */}
       <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
         <div style={{ position: "relative", flex: 1 }}>
           <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.light, fontSize: 16 }}>⌕</span>
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, color, brand, code…"
-            style={{ width: "100%", padding: "11px 14px 11px 38px", background: T.surface, border: `1.5px solid ${T.border}`, borderRadius: 12, fontSize: 14, color: T.text, outline: "none", boxSizing: "border-box", fontFamily: "inherit" }} />
+            style={{
+              width: "100%",
+              padding: "11px 14px",
+              background: T.alt,
+              border: `1.5px solid ${T.border}`,
+              borderRadius: 12,
+              fontSize: 13,
+              color: T.text,
+              outline: "none",
+              boxSizing: "border-box",
+              fontFamily: "'Inter','Helvetica Neue',sans-serif",
+            }} />
         </div>
         <SyncBadge status={syncStatus} lastSync={lastSync} onSync={onSync} />
       </div>
@@ -410,11 +434,11 @@ export default function WardrobeTab({
       )}
 
       {/* ── Grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 14 }}>
         {f.map((item) => (
-          <div key={item.id} onClick={() => openDetail(item)} className="wardrobe-card" style={{ cursor: "pointer" }}>
+          <div key={item.id} onClick={() => openDetail(item)} className="wardrobe-card" style={{ cursor: "pointer", borderRadius: "16px", overflow: "hidden" }}>
             <div style={{ position: "relative" }}>
-              <ItemVisual item={item} size={148} />
+              <ItemVisual item={item} size={140} />
               {item.t === "Yes" && (
                 <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6, letterSpacing: 0.5 }}>✈</div>
               )}
@@ -443,15 +467,18 @@ export default function WardrobeTab({
                 </a>
               )}
             </div>
-            <div style={{ padding: "8px 2px 0" }}>
-              <p style={{ fontSize: 11, fontWeight: 600, color: T.text, lineHeight: 1.3, marginBottom: 3, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            <div style={{ padding: "12px 14px 14px" }}>
+              <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: T.mid, marginBottom: 4 }}>
+                {item.c}
+              </p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, lineHeight: 1.3, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
                 {item.n || item.itemName}
               </p>
               <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                 <Chip text={item.col || item.color} />
                 <Chip text={item.w} colors={T.weather[item.w]} />
                 {item.price && (
-                  <span style={{ fontSize: 9, color: "#4ADE80", fontWeight: 700 }}>
+                  <span style={{ fontSize: 12, color: T.accent, fontWeight: 700 }}>
                     ₹{Number(item.price).toLocaleString("en-IN")}
                   </span>
                 )}

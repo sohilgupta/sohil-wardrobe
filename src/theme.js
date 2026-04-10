@@ -16,6 +16,9 @@ export const T = {
   mid: "#8A8780",
   light: "#5C5A55",
   green: "#4ADE80",
+  accent:       "#0A84FF",
+  accentDim:    "rgba(10,132,255,0.12)",
+  accentBorder: "rgba(10,132,255,0.25)",
   weather: {
     Cold: ["#1E3A5F", "#93C5FD"],
     Mild: ["#14532D", "#4ADE80"],

@@ -73,6 +73,19 @@ export default function TripTab({
 
   return (
     <div>
+      {/* ── Apple Marketing Hero ── */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
+          Trip Overview
+        </p>
+        <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
+          AU &amp; NZ.
+        </p>
+        <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
+          {TRIP.length} days · Australia &amp; New Zealand
+        </p>
+      </div>
+
       {/* ── Header card ── */}
       <div
         style={{
@@ -218,10 +231,11 @@ export default function TripTab({
                 style={{
                   flex: 1,
                   background: T.surface,
-                  border: `1.5px solid ${T.borderLight}`,
-                  borderRadius: 14,
-                  overflow: "hidden",
+                  border: `1px solid ${T.borderLight}`,
+                  borderRadius: 16,
+                  padding: "16px 18px",
                   cursor: "pointer",
+                  overflow: "hidden",
                   transition: "border-color 0.15s",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.borderColor = T.border)}
@@ -229,7 +243,6 @@ export default function TripTab({
               >
                 <div
                   style={{
-                    padding: "13px 14px",
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
@@ -242,11 +255,11 @@ export default function TripTab({
                         display: "flex",
                         alignItems: "center",
                         gap: 7,
-                        marginBottom: 3,
+                        marginBottom: 4,
                       }}
                     >
                       <span style={{ fontSize: 15 }}>{day.e}</span>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>
+                      <span style={{ fontSize: 16, fontWeight: 700, letterSpacing: -0.3, color: T.text }}>
                         {day.city}
                       </span>
                       {frozen && (
@@ -258,7 +271,7 @@ export default function TripTab({
                         </span>
                       )}
                     </div>
-                    <p style={{ fontSize: 10, color: T.light, marginBottom: 6 }}>{day.date}</p>
+                    <p style={{ fontSize: 12, color: T.mid, fontWeight: 400, marginBottom: 6 }}>{day.date}</p>
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                       {day.day   && <Chip text={day.day} />}
                       {day.night && <Chip text={day.night} colors={["#4A1942", "#F9A8D4"]} />}

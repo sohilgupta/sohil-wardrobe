@@ -11,10 +11,10 @@ import { supabase, supabaseConfigured } from "../lib/supabase";
 import { T } from "../theme";
 
 const LOGO_STYLE = {
-  fontFamily: "'Cormorant Garamond',serif",
-  fontSize: 36,
-  fontWeight: 700,
-  letterSpacing: -1,
+  fontFamily: "'Inter','Helvetica Neue',sans-serif",
+  fontSize: 40,
+  fontWeight: 800,
+  letterSpacing: -1.5,
   color: T.text,
 };
 
@@ -64,142 +64,107 @@ export default function AuthPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: `radial-gradient(ellipse 80% 60% at 50% 0%, #1e1a2e 0%, ${T.bg} 60%)`,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
-        color: T.text,
-        padding: "20px",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+    <div style={{
+      minHeight: "100vh",
+      background: `radial-gradient(ellipse 90% 70% at 50% -10%, #0D1B2E 0%, ${T.bg} 55%)`,
+      display: "flex",
+      flexDirection: "column",
+      alignItems: "center",
+      justifyContent: "center",
+      fontFamily: "'Inter','Helvetica Neue',sans-serif",
+      color: T.text,
+      padding: "20px",
+      position: "relative",
+      overflow: "hidden",
+    }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,700;1,400&family=DM+Sans:wght@400;500;600;700&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
         body{background:${T.bg};}
-        ::placeholder{color:${T.light};}
+        ::placeholder{color:${T.light};font-family:'Inter','Helvetica Neue',sans-serif;}
         input:focus{border-color:${T.mid} !important;outline:none;}
-        .auth-btn{transition:all 0.2s ease;}
+        .auth-btn{transition:all 0.2s ease;font-family:'Inter','Helvetica Neue',sans-serif;}
         .auth-btn:hover:not(:disabled){opacity:0.88;transform:translateY(-1px);}
         @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
         .auth-card{animation:fadeUp 0.5s ease forwards;}
       `}</style>
 
-      {/* Grain texture overlay */}
+      {/* Subtle blue accent line at top */}
+      <div style={{
+        position: "absolute", top: 0, left: 0, right: 0, height: 2,
+        background: `linear-gradient(90deg, transparent, ${T.accent}, transparent)`,
+        opacity: 0.6, zIndex: 1,
+      }} />
+
+      {/* Grain texture */}
       <div style={{
         position: "absolute", inset: 0, pointerEvents: "none", zIndex: 0,
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E")`,
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E")`,
         backgroundRepeat: "repeat", backgroundSize: "128px",
       }} />
 
-      {/* Decorative top accent line */}
-      <div style={{
-        position: "absolute", top: 0, left: "30%", right: "30%", height: 1,
-        background: "linear-gradient(90deg, transparent, rgba(167,139,250,0.3), transparent)",
-        zIndex: 1,
-      }} />
-
-      <div
-        className="auth-card"
-        style={{
-          position: "relative", zIndex: 2,
-          background: "rgba(26,26,31,0.85)",
-          backdropFilter: "blur(12px)",
-          border: `1px solid rgba(255,255,255,0.07)`,
-          borderRadius: 20,
-          padding: "48px 40px",
-          width: "100%",
-          maxWidth: 380,
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05)",
-        }}
-      >
+      <div className="auth-card" style={{
+        position: "relative", zIndex: 2,
+        background: "rgba(22,22,28,0.88)",
+        backdropFilter: "blur(16px)",
+        border: `1px solid rgba(255,255,255,0.07)`,
+        borderRadius: 24,
+        padding: "52px 44px",
+        width: "100%",
+        maxWidth: 400,
+        boxShadow: "0 32px 80px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.05)",
+      }}>
         {/* Wordmark */}
-        <div style={{ textAlign: "center", marginBottom: 44 }}>
-          <p style={{ ...LOGO_STYLE, fontStyle: "italic", fontSize: 42, letterSpacing: -1.5 }}>Vesti</p>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", marginTop: 10 }}>
-            <div style={{ height: "0.5px", width: 28, background: T.light, opacity: 0.4 }} />
-            <p style={{ fontSize: 9, color: T.light, letterSpacing: 3, fontWeight: 500, opacity: 0.7 }}>
-              AI WARDROBE PLANNER
+        <div style={{ textAlign: "center", marginBottom: 48 }}>
+          <p style={{ ...LOGO_STYLE }}>Vesti</p>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, justifyContent: "center", marginTop: 12 }}>
+            <div style={{ height: "0.5px", width: 32, background: T.light, opacity: 0.3 }} />
+            <p style={{ fontSize: 9, color: T.accent, letterSpacing: 3.5, fontWeight: 700, opacity: 0.9 }}>
+              AI WARDROBE
             </p>
-            <div style={{ height: "0.5px", width: 28, background: T.light, opacity: 0.4 }} />
+            <div style={{ height: "0.5px", width: 32, background: T.light, opacity: 0.3 }} />
           </div>
         </div>
 
         {/* Dev-mode setup notice */}
         {!supabaseConfigured && (
-          <div
-            style={{
-              background: "#1C1508",
-              border: "1px solid #78350F",
-              borderRadius: 8,
-              padding: "10px 14px",
-              marginBottom: 20,
-              fontSize: 11,
-              color: "#FBBF24",
-              lineHeight: 1.6,
-            }}
-          >
+          <div style={{
+            background: "#1C1508", border: "1px solid #78350F", borderRadius: 10,
+            padding: "10px 14px", marginBottom: 20, fontSize: 11, color: "#FBBF24", lineHeight: 1.6,
+          }}>
             <strong>Setup required</strong> — add to <code style={{ background: "#2A1E08", padding: "1px 4px", borderRadius: 3 }}>.env.local</code>:<br />
             <code style={{ color: "#FCD34D" }}>VITE_SUPABASE_URL</code><br />
             <code style={{ color: "#FCD34D" }}>VITE_SUPABASE_ANON_KEY</code>
           </div>
         )}
 
-        {/* OTP Sent confirmation */}
+        {/* OTP Sent */}
         {mode === "otp_sent" ? (
           <div style={{ textAlign: "center" }}>
-            <p style={{ fontSize: 28, marginBottom: 16 }}>✉️</p>
-            <p style={{ fontSize: 15, fontWeight: 600, marginBottom: 8 }}>Check your inbox</p>
-            <p style={{ fontSize: 13, color: T.mid, lineHeight: 1.6, marginBottom: 24 }}>
+            <p style={{ fontSize: 32, marginBottom: 16 }}>✉️</p>
+            <p style={{ fontSize: 18, fontWeight: 700, letterSpacing: -0.3, marginBottom: 8 }}>Check your inbox</p>
+            <p style={{ fontSize: 13, color: T.mid, lineHeight: 1.7, marginBottom: 28 }}>
               We sent a magic link to <strong style={{ color: T.text }}>{email}</strong>.<br />
               Click it to sign in — no password needed.
             </p>
-            <button
-              onClick={() => { setMode("email"); setError(""); }}
-              style={{
-                background: "none",
-                border: "none",
-                color: T.mid,
-                fontSize: 12,
-                cursor: "pointer",
-                letterSpacing: 0.5,
-              }}
-            >
+            <button onClick={() => { setMode("email"); setError(""); }}
+              style={{ background: "none", border: "none", color: T.mid, fontSize: 12, cursor: "pointer", letterSpacing: 0.3 }}>
               Use a different email
             </button>
           </div>
         ) : (
           <>
-            {/* Google */}
-            <button
-              className="auth-btn"
-              onClick={handleGoogle}
-              disabled={loading}
+            {/* Google button */}
+            <button className="auth-btn" onClick={handleGoogle} disabled={loading}
               style={{
-                width: "100%",
-                padding: "13px 16px",
-                background: T.text,
-                color: T.bg,
-                border: "none",
-                borderRadius: 10,
-                fontSize: 13,
-                fontWeight: 700,
-                letterSpacing: 0.5,
+                width: "100%", padding: "14px 16px",
+                background: T.text, color: T.bg,
+                border: "none", borderRadius: 12,
+                fontSize: 14, fontWeight: 700, letterSpacing: -0.1,
                 cursor: loading ? "not-allowed" : "pointer",
                 opacity: loading ? 0.6 : 1,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 10,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                 marginBottom: 14,
-              }}
-            >
+              }}>
               <GoogleIcon />
               Continue with Google
             </button>
@@ -207,107 +172,57 @@ export default function AuthPage() {
             {/* Divider */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
               <div style={{ flex: 1, height: 1, background: T.border }} />
-              <span style={{ fontSize: 11, color: T.light, letterSpacing: 1 }}>OR</span>
+              <span style={{ fontSize: 11, color: T.light, letterSpacing: 1.5 }}>OR</span>
               <div style={{ flex: 1, height: 1, background: T.border }} />
             </div>
 
             {/* Email OTP */}
             {mode === "email" ? (
               <form onSubmit={handleEmailOTP}>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  autoFocus
-                  autoComplete="email"
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com" autoFocus autoComplete="email"
                   style={{
-                    width: "100%",
-                    padding: "13px 14px",
-                    background: T.alt,
-                    border: `1px solid ${error ? "#EF4444" : T.border}`,
-                    borderRadius: 8,
-                    color: T.text,
-                    fontSize: 15,
-                    marginBottom: error ? 10 : 12,
-                    display: "block",
-                  }}
-                />
-                {error && (
-                  <p style={{ color: "#EF4444", fontSize: 12, marginBottom: 12, textAlign: "center" }}>
-                    {error}
-                  </p>
-                )}
-                <button
-                  className="auth-btn"
-                  type="submit"
-                  disabled={loading || !email}
+                    width: "100%", padding: "14px 16px",
+                    background: T.alt, border: `1px solid ${error ? "#EF4444" : T.border}`,
+                    borderRadius: 10, color: T.text, fontSize: 15,
+                    marginBottom: error ? 10 : 12, display: "block", fontFamily: "inherit",
+                  }} />
+                {error && <p style={{ color: "#EF4444", fontSize: 12, marginBottom: 12, textAlign: "center" }}>{error}</p>}
+                <button className="auth-btn" type="submit" disabled={loading || !email}
                   style={{
-                    width: "100%",
-                    padding: "13px",
-                    background: T.alt,
-                    color: T.text,
-                    border: `1px solid ${T.border}`,
-                    borderRadius: 8,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    letterSpacing: 0.5,
+                    width: "100%", padding: "14px",
+                    background: T.accentDim, color: T.accent,
+                    border: `1px solid ${T.accentBorder}`,
+                    borderRadius: 10, fontSize: 14, fontWeight: 600, letterSpacing: 0,
                     cursor: loading || !email ? "not-allowed" : "pointer",
-                    opacity: loading || !email ? 0.5 : 1,
-                    marginBottom: 10,
-                  }}
-                >
+                    opacity: loading || !email ? 0.5 : 1, marginBottom: 10,
+                  }}>
                   {loading ? "Sending…" : "Send magic link"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setMode("landing"); setError(""); }}
-                  style={{
-                    background: "none",
-                    border: "none",
-                    color: T.light,
-                    fontSize: 11,
-                    cursor: "pointer",
-                    width: "100%",
-                    textAlign: "center",
-                    letterSpacing: 0.5,
-                  }}
-                >
+                <button type="button" onClick={() => { setMode("landing"); setError(""); }}
+                  style={{ background: "none", border: "none", color: T.light, fontSize: 12, cursor: "pointer", width: "100%", textAlign: "center" }}>
                   Back
                 </button>
               </form>
             ) : (
               <>
-                <button
-                  className="auth-btn"
-                  onClick={() => setMode("email")}
+                <button className="auth-btn" onClick={() => setMode("email")}
                   style={{
-                    width: "100%",
-                    padding: "13px 16px",
-                    background: "none",
-                    color: T.mid,
+                    width: "100%", padding: "14px 16px",
+                    background: "none", color: T.mid,
                     border: `1px solid ${T.border}`,
-                    borderRadius: 10,
-                    fontSize: 13,
-                    fontWeight: 500,
-                    cursor: "pointer",
-                  }}
-                >
+                    borderRadius: 12, fontSize: 14, fontWeight: 500, cursor: "pointer",
+                  }}>
                   Continue with Email
                 </button>
-                {error && (
-                  <p style={{ color: "#EF4444", fontSize: 12, marginTop: 12, textAlign: "center" }}>
-                    {error}
-                  </p>
-                )}
+                {error && <p style={{ color: "#EF4444", fontSize: 12, marginTop: 12, textAlign: "center" }}>{error}</p>}
               </>
             )}
           </>
         )}
       </div>
 
-      {/* Footer attribution */}
-      <p style={{ fontSize: 11, color: T.light, marginTop: 32, opacity: 0.6 }}>
+      <p style={{ fontSize: 11, color: T.light, marginTop: 28, opacity: 0.5, fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
         Designed &amp; developed by Sohil Gupta
       </p>
     </div>

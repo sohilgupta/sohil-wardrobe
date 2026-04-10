@@ -13,6 +13,7 @@ export default function Chip({ text, colors }) {
         background: bg,
         color: fg,
         whiteSpace: "nowrap",
+        fontFamily: "'Inter','Helvetica Neue',sans-serif",
       }}
     >
       {text}
