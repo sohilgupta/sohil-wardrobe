@@ -39,31 +39,10 @@ function AppInner() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: T.bg,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
-        }}
-      >
+      <div style={{ minHeight: "100vh", background: T.bg, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter','Helvetica Neue',sans-serif" }}>
         <div style={{ textAlign: "center" }}>
-          <p
-            style={{
-              fontFamily: "'Cormorant Garamond',serif",
-              fontSize: 28,
-              fontWeight: 700,
-              color: T.text,
-              marginBottom: 12,
-            }}
-          >
-            Vesti
-          </p>
-          <p style={{ fontSize: 10, color: T.light, letterSpacing: 3, fontWeight: 600 }}>
-            LOADING…
-          </p>
+          <p style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif", fontSize: 28, fontWeight: 800, letterSpacing: -0.8, color: T.text, marginBottom: 10 }}>Vesti</p>
+          <p style={{ fontSize: 10, color: T.accent, letterSpacing: 3, fontWeight: 600 }}>LOADING…</p>
         </div>
       </div>
     );
@@ -114,168 +93,82 @@ function AuthenticatedApp({ onLogout }) {
       style={{
         minHeight: "100vh",
         background: T.bg,
-        fontFamily: "'DM Sans','Helvetica Neue',sans-serif",
+        fontFamily: "'Inter','Helvetica Neue',sans-serif",
         color: T.text,
         display: "flex",
         flexDirection: "column",
       }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;700&family=DM+Sans:wght@400;500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
         *{box-sizing:border-box;margin:0;padding:0;}
+        body{background:${T.bg};color:${T.text};font-family:'Inter','Helvetica Neue',sans-serif;}
         ::-webkit-scrollbar{width:3px;height:3px}
         ::-webkit-scrollbar-thumb{background:${T.border};border-radius:4px}
         ::-webkit-scrollbar-track{background:transparent}
-        select,input{outline:none;}
+        select,input{outline:none;font-family:'Inter','Helvetica Neue',sans-serif;}
         select option{background:${T.surface};color:${T.text};}
         button:active{transform:scale(0.98);}
-        body{background:${T.bg};color:${T.text};}
         ::placeholder{color:${T.light};}
         @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
+        @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        .wardrobe-card{transition:transform 0.18s ease,box-shadow 0.18s ease;border-radius:16px;}
+        .wardrobe-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,0.5);}
         .nav-tab{transition:background 0.15s;}
-        .nav-tab:hover{background:rgba(232,230,225,0.04);}
-        .wardrobe-card{transition:transform 0.18s ease,box-shadow 0.18s ease;border-radius:14px;}
-        .wardrobe-card:hover{transform:translateY(-3px);box-shadow:0 8px 24px rgba(0,0,0,0.45);}
       `}</style>
 
       {/* Header */}
-      <div
-        style={{
-          background: T.surface,
-          borderBottom: `1px solid ${T.borderLight}`,
-          position: "sticky",
-          top: 0,
-          zIndex: 100,
-        }}
-      >
-        <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 16px" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              height: 54,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <span
-                style={{
-                  fontFamily: "'Cormorant Garamond',serif",
-                  fontSize: 24,
-                  fontWeight: 700,
-                  letterSpacing: -0.5,
-                  color: T.text,
-                }}
-              >
+      <div style={{ background: T.surface, borderBottom: `1px solid ${T.borderLight}`, position: "sticky", top: 0, zIndex: 100 }}>
+        <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 20px" }}>
+          {/* Top bar: wordmark + stats */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 56 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontFamily: "'Inter','Helvetica Neue',sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: -0.8, color: T.text }}>
                 Vesti
               </span>
               {isPro && (
-                <span
-                  style={{
-                    fontSize: 9,
-                    color: "#A78BFA",
-                    letterSpacing: 1.5,
-                    fontWeight: 700,
-                    background: "#2E1065",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                  }}
-                >
+                <span style={{ fontSize: 9, color: T.accent, letterSpacing: 1.5, fontWeight: 700, background: T.accentDim, border: `1px solid ${T.accentBorder}`, padding: "2px 7px", borderRadius: 20 }}>
                   PRO
                 </span>
               )}
             </div>
-            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
-              <div style={{ textAlign: "center" }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: T.text, lineHeight: 1 }}>
-                  {wardrobe.length}
-                </p>
-                <p style={{ fontSize: 8, color: T.light, letterSpacing: 1, marginTop: 1 }}>ITEMS</p>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontSize: 16, fontWeight: 800, color: T.text, lineHeight: 1, letterSpacing: -0.4 }}>{wardrobe.length}</p>
+                <p style={{ fontSize: 8, color: T.light, letterSpacing: 1.5, marginTop: 1, fontWeight: 600, textTransform: "uppercase" }}>Items</p>
               </div>
-              <div style={{ textAlign: "center" }}>
-                <p style={{ fontSize: 14, fontWeight: 700, color: T.green, lineHeight: 1 }}>
-                  {travel}
-                </p>
-                <p style={{ fontSize: 8, color: T.light, letterSpacing: 1, marginTop: 1 }}>TRAVEL</p>
+              <div style={{ width: 1, height: 24, background: T.border }} />
+              <div style={{ textAlign: "right" }}>
+                <p style={{ fontSize: 16, fontWeight: 800, color: T.green, lineHeight: 1, letterSpacing: -0.4 }}>{travel}</p>
+                <p style={{ fontSize: 8, color: T.light, letterSpacing: 1.5, marginTop: 1, fontWeight: 600, textTransform: "uppercase" }}>Travel</p>
               </div>
               {capsuleCount > 0 && (
-                <button
-                  onClick={() => setTab("capsule")}
-                  title="View Trip Capsule"
-                  style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    padding: 0,
-                    textAlign: "center",
-                  }}
-                >
-                  <p style={{ fontSize: 14, fontWeight: 700, color: "#2DD4BF", lineHeight: 1 }}>
-                    {capsuleCount}
-                  </p>
-                  <p style={{ fontSize: 8, color: "#2DD4BF", letterSpacing: 1, marginTop: 1 }}>CAPSULE</p>
-                </button>
+                <>
+                  <div style={{ width: 1, height: 24, background: T.border }} />
+                  <button onClick={() => setTab("capsule")} title="View Trip Capsule"
+                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0, textAlign: "right" }}>
+                    <p style={{ fontSize: 16, fontWeight: 800, color: "#2DD4BF", lineHeight: 1, letterSpacing: -0.4 }}>{capsuleCount}</p>
+                    <p style={{ fontSize: 8, color: "#2DD4BF", letterSpacing: 1.5, marginTop: 1, fontWeight: 600, textTransform: "uppercase" }}>Capsule</p>
+                  </button>
+                </>
               )}
-              <button
-                onClick={onLogout}
-                title="Sign out"
-                style={{
-                  background: "none",
-                  border: `1px solid ${T.border}`,
-                  borderRadius: 6,
-                  color: T.light,
-                  fontSize: 9,
-                  fontWeight: 600,
-                  letterSpacing: 1,
-                  padding: "4px 8px",
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={onLogout} title="Sign out"
+                style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 20, color: T.light, fontSize: 10, fontWeight: 600, letterSpacing: 1, padding: "5px 12px", cursor: "pointer" }}>
                 EXIT
               </button>
             </div>
           </div>
-          <div style={{ display: "flex", borderTop: `1px solid ${T.borderLight}` }}>
+
+          {/* Nav tabs */}
+          <div style={{ display: "flex", gap: 0, borderTop: `1px solid ${T.borderLight}` }}>
             {NAV.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => setTab(n.id)}
-                className="nav-tab"
-                style={{
-                  flex: 1,
-                  padding: "9px 0 10px",
-                  background: tab === n.id ? "rgba(232,230,225,0.06)" : "none",
-                  border: "none",
-                  cursor: "pointer",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: 2,
-                  position: "relative",
-                }}
-              >
+              <button key={n.id} onClick={() => setTab(n.id)} className="nav-tab"
+                style={{ flex: 1, padding: "10px 0 11px", background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, position: "relative" }}>
                 {tab === n.id && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: "20%",
-                      right: "20%",
-                      height: 2,
-                      background: T.text,
-                      borderRadius: "0 0 2px 2px",
-                    }}
-                  />
+                  <div style={{ position: "absolute", top: 0, left: "15%", right: "15%", height: 2, background: T.accent, borderRadius: "0 0 2px 2px" }} />
                 )}
-                <span style={{ fontSize: 13, color: tab === n.id ? T.text : T.light }}>{n.icon}</span>
-                <span
-                  style={{
-                    fontSize: 8,
-                    fontWeight: tab === n.id ? 700 : 500,
-                    color: tab === n.id ? T.text : T.light,
-                    letterSpacing: 0.8,
-                  }}
-                >
+                <span style={{ fontSize: 12, color: tab === n.id ? T.accent : T.light }}>{n.icon}</span>
+                <span style={{ fontSize: 7.5, fontWeight: tab === n.id ? 700 : 500, color: tab === n.id ? T.text : T.light, letterSpacing: 0.8, textTransform: "uppercase" }}>
                   {n.label}
                 </span>
               </button>
@@ -285,7 +178,7 @@ function AuthenticatedApp({ onLogout }) {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, maxWidth: 700, margin: "0 auto", padding: "20px 16px 40px", width: "100%" }}>
+      <div style={{ flex: 1, maxWidth: 700, margin: "0 auto", padding: "28px 20px 60px", width: "100%" }}>
         {tab === "wardrobe" && (
           <WardrobeTab
             wardrobe={wardrobe}
@@ -332,15 +225,8 @@ function AuthenticatedApp({ onLogout }) {
 
 function AppFooter() {
   return (
-    <footer
-      style={{
-        borderTop: `1px solid ${T.borderLight}`,
-        padding: "16px",
-        textAlign: "center",
-        background: T.surface,
-      }}
-    >
-      <p style={{ fontSize: 10, color: T.light, letterSpacing: 0.5 }}>
+    <footer style={{ borderTop: `1px solid ${T.borderLight}`, padding: "20px", textAlign: "center", background: T.surface }}>
+      <p style={{ fontSize: 11, color: T.light, letterSpacing: 0.3, fontWeight: 400 }}>
         Designed &amp; developed by Sohil Gupta
       </p>
     </footer>
