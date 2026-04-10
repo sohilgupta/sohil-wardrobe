@@ -53,10 +53,10 @@ function CapsuleCard({ item, inCapsule, isFrozenItem, onToggle }) {
       <div
         onClick={onToggle}
         style={{
-          borderRadius: 12,
+          borderRadius: 14,
           overflow: "hidden",
           border: `2px solid ${inCapsule ? "#14B8A6" : T.borderLight}`,
-          background: T.alt,
+          background: T.surface,
           cursor: "pointer",
           transition: "border-color 0.15s",
           position: "relative",
@@ -235,6 +235,19 @@ export default function CapsuleTab({
 
   return (
     <div>
+      {/* ── Apple Marketing Hero ── */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
+          Trip Capsule
+        </p>
+        <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
+          {capsuleIds.size > 0 ? `${capsuleIds.size} Pieces.` : "Build Your Capsule."}
+        </p>
+        <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
+          {capsuleIds.size === 0 ? "Curate your ideal travel wardrobe" : "Your curated travel collection"}
+        </p>
+      </div>
+
       {/* ── Header ── */}
       <div style={{ marginBottom: 16 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 4 }}>
@@ -348,18 +361,13 @@ export default function CapsuleTab({
           disabled={aiLoading || wardrobe.length === 0}
           style={{
             width: "100%",
-            padding: "13px 20px",
-            borderRadius: 14,
-            border: aiDone ? "1.5px solid #14B8A6" : aiLoading ? `1.5px solid ${T.border}` : "1.5px solid transparent",
-            background: aiLoading
-              ? T.alt
-              : aiDone
-                ? "#0D2E2B"
-                : "linear-gradient(135deg, #0D2E2B 0%, #0f3460 100%)",
-            color: aiLoading ? T.light : aiDone ? "#2DD4BF" : T.text,
+            background: aiLoading ? T.alt : aiDone ? "#0D2E2B" : T.accentDim,
+            border: aiDone ? "1px solid #14B8A6" : aiLoading ? `1px solid ${T.border}` : `1px solid ${T.accentBorder}`,
+            borderRadius: 12,
+            color: aiLoading ? T.light : aiDone ? "#2DD4BF" : T.accent,
             fontSize: 13,
             fontWeight: 700,
-            letterSpacing: 0.5,
+            padding: "13px 20px",
             cursor: aiLoading || wardrobe.length === 0 ? "not-allowed" : "pointer",
             fontFamily: "inherit",
             display: "flex",
@@ -367,7 +375,7 @@ export default function CapsuleTab({
             justifyContent: "center",
             gap: 8,
             transition: "all 0.2s",
-            boxShadow: aiLoading || aiDone ? "none" : "0 4px 20px rgba(13,46,43,0.4)",
+            letterSpacing: 0.5,
           }}
         >
           {aiLoading ? (
