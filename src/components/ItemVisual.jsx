@@ -19,7 +19,7 @@ export default function ItemVisual({ item, size = 160 }) {
         style={{
           width: size,
           height: size,
-          borderRadius: 14,
+          borderRadius: 16,
           overflow: "hidden",
           flexShrink: 0,
           background: `linear-gradient(145deg, ${bg} 0%, ${accent} 100%)`,
@@ -103,7 +103,7 @@ export default function ItemVisual({ item, size = 160 }) {
       style={{
         width: size,
         height: size,
-        borderRadius: 14,
+        borderRadius: 16,
         overflow: "hidden",
         flexShrink: 0,
         background: T.alt,
