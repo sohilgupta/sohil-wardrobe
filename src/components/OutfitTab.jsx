@@ -102,6 +102,19 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds,
 
   return (
     <div>
+      {/* ── Apple Marketing Hero ── */}
+      <div style={{ marginBottom: 28 }}>
+        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
+          AI Styling
+        </p>
+        <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
+          Generate Outfits.
+        </p>
+        <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
+          Let AI suggest complete looks from your wardrobe
+        </p>
+      </div>
+
       {/* ── Inputs card ── */}
       <div
         style={{
@@ -222,20 +235,21 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds,
           disabled={genLoading || wardrobe.length === 0}
           style={{
             width: "100%",
-            padding: 15,
-            background: genLoading ? T.alt : T.text,
-            color: genLoading ? T.light : T.bg,
+            background: T.accent,
             border: "none",
-            borderRadius: 12,
+            borderRadius: 14,
+            color: "#fff",
             fontSize: 15,
             fontWeight: 700,
+            padding: "15px 24px",
             cursor: genLoading || wardrobe.length === 0 ? "not-allowed" : "pointer",
-            opacity: genLoading ? 0.7 : 1,
+            opacity: genLoading ? 0.6 : 1,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             gap: 8,
             fontFamily: "inherit",
+            letterSpacing: -0.2,
           }}
         >
           {genLoading ? (
@@ -294,12 +308,13 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds,
               <button
                 onClick={handleGenerate}
                 style={{
-                  padding: "5px 14px",
-                  borderRadius: 8,
-                  border: `1.5px solid ${T.border}`,
-                  background: "none",
-                  fontSize: 12,
-                  color: T.mid,
+                  background: T.accentDim,
+                  border: `1px solid ${T.accentBorder}`,
+                  borderRadius: 12,
+                  color: T.accent,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  padding: "10px 16px",
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
