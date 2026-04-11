@@ -281,5 +281,18 @@ export default function useOutfits() {
     });
   }, [pushToBackend, userId]);
 
-  return { outfitIds, setOutfitIds, frozenDays, toggleFreeze, maxFreeDays: MAX_FREE_DAYS };
+  /* ── Bulk-set frozen days (used for one-time data migration) ── */
+  const setManyFrozenDays = useCallback((frozenObj) => {
+    const next  = { ...frozenObj };
+    const now   = new Date().toISOString();
+    const newAt = { ...updatedAtRef.current };
+    Object.keys(next).forEach((dayId) => { newAt[dayId] = now; });
+    frozenRef.current    = next;
+    updatedAtRef.current = newAt;
+    _setFrozenDays(next);
+    saveLocal(userId, outfitRef.current, next, newAt);
+    pushToBackend(outfitRef.current, next, newAt);
+  }, [pushToBackend, userId]);
+
+  return { outfitIds, setOutfitIds, frozenDays, toggleFreeze, setManyFrozenDays, maxFreeDays: MAX_FREE_DAYS };
 }

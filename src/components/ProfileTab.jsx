@@ -10,10 +10,48 @@ import { useState } from "react";
 import { T } from "../theme";
 import { useAuth, usePlan } from "../contexts/AuthContext";
 
-export default function ProfileTab({ photos, onAdd, onRemove, onClearAll, maxPhotos }) {
+/* ── One-time migration export script (user runs this on sohil-wardrobe.vercel.app) ── */
+const EXPORT_SCRIPT = `copy(JSON.stringify({v:1,capsule:JSON.parse(localStorage.getItem("wdb_capsule_v1")||"[]"),outfits:JSON.parse(localStorage.getItem("wdb_outfits_v3")||localStorage.getItem("wdb_outfits_v1")||"{}")}))`;
+
+export default function ProfileTab({ photos, onAdd, onRemove, onClearAll, maxPhotos, onImportData }) {
   const { user, signOut } = useAuth();
   const { isPro } = usePlan();
-  const [upgrading, setUpgrading] = useState(false);
+  const [upgrading,    setUpgrading]    = useState(false);
+  const [importJson,   setImportJson]   = useState("");
+  const [importStatus, setImportStatus] = useState(null); // null | "ok" | "error"
+  const [importMsg,    setImportMsg]    = useState("");
+  const [scriptCopied, setScriptCopied] = useState(false);
+
+  function handleCopyScript() {
+    navigator.clipboard.writeText(EXPORT_SCRIPT).then(() => {
+      setScriptCopied(true);
+      setTimeout(() => setScriptCopied(false), 2000);
+    });
+  }
+
+  function handleImport() {
+    setImportStatus(null);
+    setImportMsg("");
+    try {
+      const data = JSON.parse(importJson.trim());
+      if (!data || typeof data !== "object") throw new Error("Invalid JSON");
+
+      const capsuleArr = Array.isArray(data.capsule) ? data.capsule : [];
+      const outfitsRaw = data.outfits && typeof data.outfits === "object" ? data.outfits : {};
+
+      // outfitsRaw may be { outfitIds, frozenDays, updatedAt } (wdb_outfits_v3 format)
+      const outfitIds  = outfitsRaw.outfitIds  || {};
+      const frozenDays = outfitsRaw.frozenDays  || {};
+
+      onImportData({ capsuleArr, outfitIds, frozenDays });
+      setImportStatus("ok");
+      setImportMsg(`Imported ${capsuleArr.length} capsule items and ${Object.keys(outfitIds).length} outfit days.`);
+      setImportJson("");
+    } catch (err) {
+      setImportStatus("error");
+      setImportMsg("Could not parse the data. Make sure you pasted the full copied text.");
+    }
+  }
 
   async function handleUpgrade() {
     setUpgrading(true);
@@ -172,6 +210,106 @@ export default function ProfileTab({ photos, onAdd, onRemove, onClearAll, maxPho
         {photos.length > 0 && (
           <button onClick={onClearAll} style={dangerBtn}>Clear all photos</button>
         )}
+      </Section>
+
+      {/* Data Migration */}
+      <Section title="Migrate Data from Old URL">
+        <p style={{ fontSize: 12, color: T.mid, marginBottom: 14, lineHeight: 1.7 }}>
+          Transfer your capsule &amp; outfit data from{" "}
+          <code style={{ fontSize: 11, color: T.light, background: T.alt, padding: "1px 5px", borderRadius: 4 }}>
+            sohil-wardrobe.vercel.app
+          </code>{" "}
+          to this app.
+        </p>
+
+        {/* Step 1 */}
+        <p style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: 0.3, marginBottom: 6 }}>
+          Step 1 — Copy this script
+        </p>
+        <div style={{ position: "relative", marginBottom: 14 }}>
+          <code style={{
+            display: "block",
+            background: T.alt,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            padding: "10px 12px",
+            fontSize: 10,
+            color: T.mid,
+            wordBreak: "break-all",
+            lineHeight: 1.6,
+            paddingRight: 72,
+          }}>
+            {EXPORT_SCRIPT}
+          </code>
+          <button onClick={handleCopyScript} style={{
+            position: "absolute", top: 8, right: 8,
+            background: scriptCopied ? "rgba(34,197,94,0.15)" : T.accentDim,
+            border: `1px solid ${scriptCopied ? "rgba(34,197,94,0.3)" : T.accentBorder}`,
+            borderRadius: 6, color: scriptCopied ? "#22C55E" : T.accent,
+            fontSize: 10, fontWeight: 700, padding: "4px 10px", cursor: "pointer", letterSpacing: 0.3,
+          }}>
+            {scriptCopied ? "Copied!" : "Copy"}
+          </button>
+        </div>
+
+        {/* Step 2 */}
+        <p style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: 0.3, marginBottom: 6 }}>
+          Step 2 — Run it on the old URL
+        </p>
+        <ol style={{ fontSize: 12, color: T.mid, lineHeight: 1.9, paddingLeft: 16, marginBottom: 14 }}>
+          <li>Open <strong style={{ color: T.light }}>sohil-wardrobe.vercel.app</strong> in a new tab</li>
+          <li>Open DevTools → Console <span style={{ color: T.light, fontSize: 11 }}>(⌘+Option+J on Mac)</span></li>
+          <li>Paste the script and press Enter — your data is now copied to clipboard</li>
+        </ol>
+
+        {/* Step 3 */}
+        <p style={{ fontSize: 11, fontWeight: 700, color: T.text, letterSpacing: 0.3, marginBottom: 6 }}>
+          Step 3 — Paste here and import
+        </p>
+        <textarea
+          value={importJson}
+          onChange={(e) => setImportJson(e.target.value)}
+          placeholder='Paste the JSON here…'
+          rows={4}
+          style={{
+            width: "100%",
+            background: T.alt,
+            border: `1px solid ${importStatus === "error" ? "#EF4444" : T.border}`,
+            borderRadius: 8,
+            color: T.text,
+            fontSize: 11,
+            padding: "10px 12px",
+            fontFamily: "monospace",
+            resize: "vertical",
+            marginBottom: 10,
+          }}
+        />
+        {importStatus && (
+          <p style={{
+            fontSize: 12, marginBottom: 10,
+            color: importStatus === "ok" ? "#22C55E" : "#EF4444",
+          }}>
+            {importMsg}
+          </p>
+        )}
+        <button
+          onClick={handleImport}
+          disabled={!importJson.trim()}
+          style={{
+            width: "100%",
+            padding: "11px",
+            background: importJson.trim() ? T.accentDim : "none",
+            border: `1px solid ${importJson.trim() ? T.accentBorder : T.border}`,
+            borderRadius: 8,
+            color: importJson.trim() ? T.accent : T.light,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: importJson.trim() ? "pointer" : "not-allowed",
+            letterSpacing: 0.5,
+          }}
+        >
+          Import Data
+        </button>
       </Section>
 
       {/* Sign Out */}

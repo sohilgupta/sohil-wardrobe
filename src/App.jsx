@@ -72,7 +72,7 @@ function AuthenticatedApp({ onLogout }) {
     addItem,
   } = useWardrobe();
 
-  const { outfitIds, setOutfitIds, frozenDays, toggleFreeze } = useOutfits();
+  const { outfitIds, setOutfitIds, frozenDays, toggleFreeze, setManyFrozenDays } = useOutfits();
   const { capsuleIds, toggleCapsule, setManyCapsule, clearCapsule } = useCapsule();
   const { photos: profilePhotos, addPhoto, removePhoto, clearAll: clearAllPhotos, MAX_PHOTOS } = useProfile();
 
@@ -213,6 +213,11 @@ function AuthenticatedApp({ onLogout }) {
             onRemove={removePhoto}
             onClearAll={clearAllPhotos}
             maxPhotos={MAX_PHOTOS}
+            onImportData={({ capsuleArr, outfitIds: importedOutfits, frozenDays: importedFrozen }) => {
+              if (capsuleArr.length > 0) setManyCapsule(capsuleArr);
+              if (Object.keys(importedOutfits).length > 0) setOutfitIds(importedOutfits);
+              if (Object.keys(importedFrozen).length > 0) setManyFrozenDays(importedFrozen);
+            }}
           />
         )}
       </div>
