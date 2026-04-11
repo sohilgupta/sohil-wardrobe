@@ -7,3 +7,5 @@ dist/
 !.env.example
 .env*.local
 .superpowers/
+.claude/
+*.png
