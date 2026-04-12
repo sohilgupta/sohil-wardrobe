@@ -62,6 +62,11 @@ function activeKey(effectiveId) {
   return `vesti_${effectiveId}_active_trip`;
 }
 
+/** Fallback localStorage key for logged-in users when Supabase column missing */
+function localFallbackKey(userId) {
+  return `vesti_${userId}_trips_local`;
+}
+
 function readLocalTrips(key) {
   try { return JSON.parse(localStorage.getItem(key)) || []; }
   catch { return []; }
@@ -87,9 +92,11 @@ export default function useTripStore() {
 
   const activeTrip = trips.find((t) => t.id === activeTripId) || trips[0] || null;
 
-  /* ── Push to Supabase (debounced 500ms) ── */
+  /* ── Push to Supabase (debounced 500ms) + local mirror ── */
   const pushToBackend = useCallback((updatedTrips) => {
     if (!userId) return;
+    // Always write to localStorage mirror — guard against DB column missing
+    saveLocalTrips(localFallbackKey(userId), updatedTrips);
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(async () => {
       try {
@@ -113,23 +120,40 @@ export default function useTripStore() {
     async function load() {
       if (userId) {
         try {
-          const { data } = await supabase
+          const { data, error } = await supabase
             .from("profiles")
             .select("trips_data")
             .eq("id", userId)
             .single();
 
-          let loaded = data?.trips_data || [];
+          // If column doesn't exist yet (migration pending), fall back to localStorage mirror
+          let loaded = (!error && data?.trips_data) || null;
+
+          if (loaded === null) {
+            // trips_data column unavailable — use localStorage mirror
+            loaded = readLocalTrips(localFallbackKey(userId));
+          }
 
           if (loaded.length === 0 && isOwner) {
             loaded = seedFromStatic();
-            await supabase.from("profiles").update({ trips_data: loaded }).eq("id", userId).catch(() => {});
+            // Persist to both localStorage mirror and Supabase (Supabase may fail if column missing)
+            saveLocalTrips(localFallbackKey(userId), loaded);
+            supabase.from("profiles").update({ trips_data: loaded }).eq("id", userId).catch(() => {});
           }
 
           setTrips(loaded);
           const saved = localStorage.getItem(activeKey(userId));
           setActiveTripId(saved || loaded[0]?.id || null);
-        } catch {}
+        } catch {
+          // Network/parse error — seed owner from localStorage mirror or static data
+          if (isOwner) {
+            const fallback = readLocalTrips(localFallbackKey(userId));
+            const seeded   = fallback.length > 0 ? fallback : seedFromStatic();
+            if (fallback.length === 0) saveLocalTrips(localFallbackKey(userId), seeded);
+            setTrips(seeded);
+            setActiveTripId(seeded[0]?.id || null);
+          }
+        }
       } else if (localKey) {
         const local = readLocalTrips(localKey);
         setTrips(local);
