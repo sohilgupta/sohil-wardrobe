@@ -61,7 +61,7 @@ export default function GuestLanding({ onAddItem, onTryDemo }) {
         </button>
         <button onClick={onTryDemo}
           style={{ flex: 1, background: "transparent", color: T.accent,
-            border: `1.5px solid rgba(10,132,255,0.35)`, borderRadius: 12,
+            border: `1.5px solid ${T.accentBorder}`, borderRadius: 12,
             padding: "12px 0", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
           Try demo →
         </button>
