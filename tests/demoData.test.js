@@ -7,13 +7,14 @@ beforeEach(() => {
 });
 
 // Import after clearing so module constants are stable
-let loadDemo, clearDemo, DEMO_ITEMS, DEMO_TRIP_ID;
+let loadDemo, clearDemo, DEMO_ITEMS, DEMO_TRIP_ID, isDemoActive;
 beforeEach(async () => {
   const m = await import("../src/utils/demoData.js");
   loadDemo    = m.loadDemo;
   clearDemo   = m.clearDemo;
   DEMO_ITEMS  = m.DEMO_ITEMS;
   DEMO_TRIP_ID = m.DEMO_TRIP_ID;
+  isDemoActive = m.isDemoActive;
 });
 
 describe("DEMO_ITEMS", () => {
@@ -62,5 +63,21 @@ describe("clearDemo", () => {
     expect(localStorage.getItem("vesti_guest_test-guest-id_trips")).toBeNull();
     expect(localStorage.getItem(`vesti_outfits_${DEMO_TRIP_ID}_v1`)).toBeNull();
     expect(localStorage.getItem("vesti_guest_test-guest-id_demo_mode")).toBeNull();
+  });
+});
+
+describe("isDemoActive", () => {
+  it("returns false for null/undefined guestId", () => {
+    expect(isDemoActive(null)).toBe(false);
+    expect(isDemoActive(undefined)).toBe(false);
+  });
+  it("returns false before loadDemo is called", () => {
+    expect(isDemoActive("test-guest-id")).toBe(false);
+  });
+  it("returns true after loadDemo, false after clearDemo", () => {
+    loadDemo("test-guest-id");
+    expect(isDemoActive("test-guest-id")).toBe(true);
+    clearDemo("test-guest-id");
+    expect(isDemoActive("test-guest-id")).toBe(false);
   });
 });

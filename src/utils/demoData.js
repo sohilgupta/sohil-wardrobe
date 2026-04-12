@@ -61,7 +61,9 @@ export function loadDemo(guestId) {
   save(tripsKey(guestId), [DEMO_TRIP]);
   save(outfitKey(), { outfitIds: DEMO_OUTFITS, frozenDays: {}, updatedAt: {} });
   localStorage.setItem(demoFlagKey(guestId), "1");
-  window.dispatchEvent(new CustomEvent("vesti-demo-loaded", { detail: { guestId } }));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("vesti-demo-loaded", { detail: { guestId } }));
+  }
 }
 
 export function clearDemo(guestId) {
@@ -70,7 +72,9 @@ export function clearDemo(guestId) {
   localStorage.removeItem(tripsKey(guestId));
   localStorage.removeItem(outfitKey());
   localStorage.removeItem(demoFlagKey(guestId));
-  window.dispatchEvent(new CustomEvent("vesti-demo-cleared", { detail: { guestId } }));
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("vesti-demo-cleared", { detail: { guestId } }));
+  }
 }
 
 export function isDemoActive(guestId) {
