@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { T } from "../theme";
+import { useTier } from "../contexts/AuthContext";
 import ItemVisual from "./ItemVisual";
 import Chip from "./Chip";
 
@@ -91,6 +92,8 @@ export default function WardrobeTab({
   lastSync,
   onSync,
 }) {
+  const { limits, isPro } = useTier();
+
   /* ── derived filter options ── */
   const cats   = useMemo(() => [...new Set(wardrobe.map((i) => i.c))].sort(),  [wardrobe]);
   const colors = useMemo(() => [...new Set(wardrobe.map((i) => i.col || i.color).filter(Boolean))].sort(), [wardrobe]);
@@ -165,6 +168,10 @@ export default function WardrobeTab({
 
   function saveAdd() {
     if (!addForm.n.trim()) return;
+    if (wardrobe.length >= limits.wardrobe) {
+      window.dispatchEvent(new CustomEvent("vesti-limit-reached", { detail: { type: "wardrobe" } }));
+      return;
+    }
     onAdd?.({
       n: addForm.n.trim(), b: addForm.b.trim(),
       col: addForm.col.trim() || "Black", c: addForm.c || "Shirts",
@@ -193,6 +200,11 @@ export default function WardrobeTab({
         </p>
         <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
           {wardrobe.length} Pieces.
+          {!isPro && (
+            <span style={{ fontSize: 11, color: "#9CA3AF", marginLeft: 8 }}>
+              ({wardrobe.length}/{limits.wardrobe === Infinity ? "\u221e" : limits.wardrobe})
+            </span>
+          )}
         </p>
         <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
           {wardrobe.filter(i => i.t === "Yes").length} travel-ready · {[...new Set(wardrobe.map(i => i.c))].length} categories
