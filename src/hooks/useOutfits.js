@@ -11,18 +11,20 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
+import useTripStore from "./useTripStore";
 
 export const MAX_FREE_DAYS = 3;
 
-/* ── Per-user storage key ──────────────────────────────────────────────────── */
-function lsKey(userId) {
-  return userId ? `vesti_${userId}_outfits_v1` : "vesti_outfits_v1";
+/* ── Per-user, per-trip storage key ───────────────────────────────────────── */
+function lsKey(userId, tripId) {
+  const base = userId ? `vesti_${userId}` : "vesti";
+  return `${base}_outfits_${tripId}_v1`;
 }
 
 /* ── localStorage helpers ──────────────────────────────────────────────────── */
-const loadLocal = (userId) => {
+const loadLocal = (userId, tripId) => {
   try {
-    const raw = JSON.parse(localStorage.getItem(lsKey(userId)));
+    const raw = JSON.parse(localStorage.getItem(lsKey(userId, tripId)));
     if (raw?.outfitIds) {
       return {
         outfitIds:  raw.outfitIds  || {},
@@ -45,9 +47,9 @@ const loadLocal = (userId) => {
   }
 };
 
-const saveLocal = (userId, outfitIds, frozenDays, updatedAt) => {
+const saveLocal = (userId, tripId, outfitIds, frozenDays, updatedAt) => {
   try {
-    localStorage.setItem(lsKey(userId), JSON.stringify({ outfitIds, frozenDays, updatedAt }));
+    localStorage.setItem(lsKey(userId, tripId), JSON.stringify({ outfitIds, frozenDays, updatedAt }));
   } catch {}
 };
 
@@ -107,7 +109,10 @@ export default function useOutfits() {
   const user   = useUser();
   const userId = user?.id ?? null;
 
-  const initial = loadLocal(userId);
+  const { activeTripId } = useTripStore();
+  const tripId = activeTripId || "trip_default";
+
+  const initial = loadLocal(userId, tripId);
 
   const [outfitIds,  _setOutfitIds]  = useState(initial.outfitIds);
   const [frozenDays, _setFrozenDays] = useState(initial.frozenDays);
@@ -124,13 +129,20 @@ export default function useOutfits() {
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(async () => {
       try {
+        const { data: existing } = await supabase
+          .from("profiles")
+          .select("outfits_data")
+          .eq("id", userId)
+          .single()
+          .catch(() => ({ data: null }));
+        const allOutfits = { ...(existing?.outfits_data || {}), [tripId]: toBackend(outfits, frozen, updAt) };
         await supabase
           .from("profiles")
-          .update({ outfits_data: toBackend(outfits, frozen, updAt) })
+          .update({ outfits_data: allOutfits })
           .eq("id", userId);
       } catch {}
     }, 500);
-  }, [userId]);
+  }, [userId, tripId]);
 
   /* ── Fetch from Supabase and merge (last-write-wins per day) ── */
   const fetchFromBackend = useCallback(async () => {
@@ -142,9 +154,11 @@ export default function useOutfits() {
         .eq("id", userId)
         .single();
 
-      if (!data?.outfits_data || Object.keys(data.outfits_data).length === 0) return;
+      if (!data?.outfits_data) return;
+      const tripData = data.outfits_data[tripId] || data.outfits_data; // fallback for old flat format
+      if (Object.keys(tripData).length === 0) return;
 
-      const { outfitIds: remO, frozenDays: remF, updatedAt: remAt } = fromBackend(data.outfits_data);
+      const { outfitIds: remO, frozenDays: remF, updatedAt: remAt } = fromBackend(tripData);
 
       const newO  = { ...outfitRef.current };
       const newF  = { ...frozenRef.current };
@@ -163,15 +177,15 @@ export default function useOutfits() {
       outfitRef.current    = newO;
       frozenRef.current    = newF;
       updatedAtRef.current = newAt;
-      saveLocal(userId, newO, newF, newAt);
+      saveLocal(userId, tripId, newO, newF, newAt);
       _setOutfitIds(newO);
       _setFrozenDays(newF);
     } catch {}
-  }, [userId]);
+  }, [userId, tripId]);
 
-  /* ── Reload state when userId changes; push local data to Supabase ── */
+  /* ── Reload state when userId or tripId changes; push local data to Supabase ── */
   useEffect(() => {
-    const local = loadLocal(userId);
+    const local = loadLocal(userId, tripId);
     outfitRef.current    = local.outfitIds;
     frozenRef.current    = local.frozenDays;
     updatedAtRef.current = local.updatedAt;
@@ -188,17 +202,25 @@ export default function useOutfits() {
             .eq("id", userId)
             .single();
 
-          if (!data?.outfits_data || Object.keys(data.outfits_data).length === 0) {
-            // Remote empty — push local data up if we have any
+          const tripData = data?.outfits_data?.[tripId] || (data?.outfits_data && !data.outfits_data[tripId] ? data.outfits_data : {});
+          if (!tripData || Object.keys(tripData).length === 0) {
+            // Remote trip data empty — push local data up if we have any
             if (Object.keys(local.outfitIds).length > 0) {
+              const { data: existing } = await supabase
+                .from("profiles")
+                .select("outfits_data")
+                .eq("id", userId)
+                .single()
+                .catch(() => ({ data: null }));
+              const allOutfits = { ...(existing?.outfits_data || {}), [tripId]: toBackend(local.outfitIds, local.frozenDays, local.updatedAt) };
               await supabase
                 .from("profiles")
-                .update({ outfits_data: toBackend(local.outfitIds, local.frozenDays, local.updatedAt) })
+                .update({ outfits_data: allOutfits })
                 .eq("id", userId);
             }
           } else {
             // Remote has data — merge it
-            const { outfitIds: remO, frozenDays: remF, updatedAt: remAt } = fromBackend(data.outfits_data);
+            const { outfitIds: remO, frozenDays: remF, updatedAt: remAt } = fromBackend(tripData);
             const newO  = { ...local.outfitIds };
             const newF  = { ...local.frozenDays };
             const newAt = { ...local.updatedAt };
@@ -214,14 +236,14 @@ export default function useOutfits() {
             outfitRef.current    = newO;
             frozenRef.current    = newF;
             updatedAtRef.current = newAt;
-            saveLocal(userId, newO, newF, newAt);
+            saveLocal(userId, tripId, newO, newF, newAt);
             _setOutfitIds(newO);
             _setFrozenDays(newF);
           }
         } catch {}
       })();
     }
-  }, [userId]);
+  }, [userId, tripId]);
 
   useEffect(() => {
     window.addEventListener("focus", fetchFromBackend);
@@ -235,7 +257,7 @@ export default function useOutfits() {
 
   useEffect(() => {
     function handleRemap() {
-      const local = loadLocal(userId);
+      const local = loadLocal(userId, tripId);
       outfitRef.current    = local.outfitIds;
       frozenRef.current    = local.frozenDays;
       updatedAtRef.current = local.updatedAt;
@@ -249,7 +271,7 @@ export default function useOutfits() {
       window.removeEventListener("wardrobe-outfit-ids-remapped", handleRemap);
       window.removeEventListener("vesti-data-migrated", handleRemap);
     };
-  }, [pushToBackend, userId]);
+  }, [pushToBackend, userId, tripId]);
 
   const setOutfitIds = useCallback((updater) => {
     _setOutfitIds((prev) => {
@@ -263,11 +285,11 @@ export default function useOutfits() {
       });
       outfitRef.current    = next;
       updatedAtRef.current = newAt;
-      saveLocal(userId, next, frozenRef.current, newAt);
+      saveLocal(userId, tripId, next, frozenRef.current, newAt);
       pushToBackend(next, frozenRef.current, newAt);
       return next;
     });
-  }, [pushToBackend, userId]);
+  }, [pushToBackend, userId, tripId]);
 
   const toggleFreeze = useCallback((dayId) => {
     _setFrozenDays((prev) => {
@@ -275,11 +297,11 @@ export default function useOutfits() {
       const newAt = { ...updatedAtRef.current, [dayId]: new Date().toISOString() };
       frozenRef.current    = next;
       updatedAtRef.current = newAt;
-      saveLocal(userId, outfitRef.current, next, newAt);
+      saveLocal(userId, tripId, outfitRef.current, next, newAt);
       pushToBackend(outfitRef.current, next, newAt);
       return next;
     });
-  }, [pushToBackend, userId]);
+  }, [pushToBackend, userId, tripId]);
 
   /* ── Bulk-set frozen days (used for one-time data migration) ── */
   const setManyFrozenDays = useCallback((frozenObj) => {
@@ -290,9 +312,9 @@ export default function useOutfits() {
     frozenRef.current    = next;
     updatedAtRef.current = newAt;
     _setFrozenDays(next);
-    saveLocal(userId, outfitRef.current, next, newAt);
+    saveLocal(userId, tripId, outfitRef.current, next, newAt);
     pushToBackend(outfitRef.current, next, newAt);
-  }, [pushToBackend, userId]);
+  }, [pushToBackend, userId, tripId]);
 
   return { outfitIds, setOutfitIds, frozenDays, toggleFreeze, setManyFrozenDays, maxFreeDays: MAX_FREE_DAYS };
 }
