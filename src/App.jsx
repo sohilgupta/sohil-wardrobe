@@ -57,7 +57,7 @@ function AppInner() {
 function AuthenticatedApp({ onLogout }) {
   const [tab, setTab] = useState("wardrobe");
   const [focusDayId, setFocusDayId] = useState(null);
-  const { isPro, tier } = useTier();
+  const { isPro, tier, isGuest } = useTier();
 
   const {
     items:      wardrobe,
@@ -150,10 +150,19 @@ function AuthenticatedApp({ onLogout }) {
                   </button>
                 </>
               )}
-              <button onClick={onLogout} title="Sign out"
-                style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 20, color: T.light, fontSize: 10, fontWeight: 600, letterSpacing: 1, padding: "5px 12px", cursor: "pointer" }}>
-                EXIT
-              </button>
+              {isGuest ? (
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent("vesti-limit-reached", { detail: { type: "login" } }))}
+                  title="Sign in to sync your data"
+                  style={{ background: T.accent, border: "none", borderRadius: 20, color: "#fff", fontSize: 10, fontWeight: 700, letterSpacing: 1, padding: "5px 14px", cursor: "pointer" }}>
+                  SIGN IN
+                </button>
+              ) : (
+                <button onClick={onLogout} title="Sign out"
+                  style={{ background: "none", border: `1px solid ${T.border}`, borderRadius: 20, color: T.light, fontSize: 10, fontWeight: 600, letterSpacing: 1, padding: "5px 12px", cursor: "pointer" }}>
+                  EXIT
+                </button>
+              )}
             </div>
           </div>
 

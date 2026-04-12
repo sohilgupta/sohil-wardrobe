@@ -28,6 +28,11 @@ const COPY = {
     sub:        () => `Guest: ${LIMITS.guest.outfitDays} days  ·  Free: unlimited  ·  Pro: unlimited`,
     proHeading: "Upgrade to plan more days",
   },
+  login: {
+    heading:    "Sign in to sync your wardrobe",
+    sub:        () => "Your data syncs across all your devices when you're signed in.",
+    proHeading: "Sign in",
+  },
 };
 
 export default function UpgradePrompt() {
