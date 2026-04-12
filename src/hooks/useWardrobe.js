@@ -22,6 +22,8 @@ import { fetchAllTabs } from "../services/SheetSyncService";
 import { enrichWithDriveImages } from "../services/DriveImageService";
 import LOCAL_W from "../data/wardrobe";
 import { useAuth } from "../contexts/AuthContext";
+import { OWNER_EMAIL } from "../utils/tiers";
+import { supabase } from "../lib/supabase";
 
 export const MAX_FREE_ITEMS = 10;
 
@@ -117,8 +119,9 @@ function applyOverrides(remoteItems, overrides) {
 
 /* ─── Hook ───────────────────────────────────────────────────────────────── */
 export default function useWardrobe() {
-  const { user, session } = useAuth();
-  const userId = user?.id ?? null;
+  const { user, session, guestId } = useAuth();
+  const userId  = user?.id ?? null;
+  const isOwner = user?.email === OWNER_EMAIL;
 
   const [items,      setItems]      = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -132,29 +135,54 @@ export default function useWardrobe() {
   const sync = useCallback(async () => {
     setSyncStatus("syncing");
     try {
-      const fresh = await fetchAllTabs(session?.access_token);
+      if (isOwner) {
+        // Owner: fetch from Google Sheets (existing logic unchanged)
+        const fresh = await fetchAllTabs(session?.access_token);
 
-      const outfitsStorageKey = userId ? `vesti_${userId}_outfits_v1` : "vesti_outfits_v1";
-      if (remoteRef.current.length) {
-        const remap    = buildIdRemap(remoteRef.current, fresh);
-        const migrated = applyRemapToOutfitStorage(remap, outfitsStorageKey);
-        if (migrated) window.dispatchEvent(new Event("wardrobe-outfit-ids-remapped"));
+        const outfitsStorageKey = userId ? `vesti_${userId}_outfits_v1` : "vesti_outfits_v1";
+        if (remoteRef.current.length) {
+          const remap    = buildIdRemap(remoteRef.current, fresh);
+          const migrated = applyRemapToOutfitStorage(remap, outfitsStorageKey);
+          if (migrated) window.dispatchEvent(new Event("wardrobe-outfit-ids-remapped"));
+        }
+
+        remoteRef.current = fresh;
+        trySave(cacheKey(userId), { items: fresh, fetchedAt: Date.now() });
+        const merged = applyOverrides(fresh, overridesRef.current);
+        setItems(merged);
+        setLastSync(Date.now());
+        setSyncStatus("ok");
+
+        enrichWithDriveImages(merged, setItems).catch(() => {});
+      } else if (userId) {
+        // Non-owner logged-in: read from Supabase wardrobe_items
+        const { data } = await supabase
+          .from("profiles")
+          .select("wardrobe_items")
+          .eq("id", userId)
+          .single();
+        const fresh = data?.wardrobe_items || [];
+        remoteRef.current = fresh;
+        const merged = applyOverrides(fresh, overridesRef.current);
+        setItems(merged);
+        setLastSync(Date.now());
+        setSyncStatus("ok");
+        setLoading(false);
+      } else {
+        // Guest: read from localStorage
+        const guestWardrobeKey = guestId ? `vesti_guest_${guestId}_wardrobe` : null;
+        const local = guestWardrobeKey ? tryParse(guestWardrobeKey, []) : [];
+        remoteRef.current = local;
+        setItems(applyOverrides(local, overridesRef.current));
+        setSyncStatus("ok");
+        setLoading(false);
       }
-
-      remoteRef.current = fresh;
-      trySave(cacheKey(userId), { items: fresh, fetchedAt: Date.now() });
-      const merged = applyOverrides(fresh, overridesRef.current);
-      setItems(merged);
-      setLastSync(Date.now());
-      setSyncStatus("ok");
-
-      enrichWithDriveImages(merged, setItems).catch(() => {});
     } catch {
       setSyncStatus("offline");
     } finally {
       setLoading(false);
     }
-  }, [userId, session]);
+  }, [userId, isOwner, guestId, session]);
 
   /* ── Re-apply overrides after one-time data migration fires ── */
   useEffect(() => {
@@ -216,21 +244,41 @@ export default function useWardrobe() {
     setItems((prev) => prev.filter((item) => item.id !== id));
   }, [userId]);
 
-  const addItem = useCallback((item) => {
+  const addItem = useCallback(async (item) => {
     const newItem = {
       ...item,
       id:      item.id || `local_${Date.now()}`,
       _source: "local",
       t:       item.t ?? "Yes",
-      selected: true,
+      selected: item.selected !== undefined ? item.selected : true,
     };
-    const o = loadOverrides(userId);
-    o.additions = [...o.additions, newItem];
-    overridesRef.current = o;
-    saveOverrides(userId, o);
-    setItems((prev) => [...prev, newItem]);
+
+    if (isOwner) {
+      // Owner: use localStorage overrides (existing logic)
+      const o = loadOverrides(userId);
+      o.additions = [...o.additions, newItem];
+      overridesRef.current = o;
+      saveOverrides(userId, o);
+      setItems((prev) => [...prev, newItem]);
+    } else if (userId) {
+      // Non-owner logged-in: persist to Supabase wardrobe_items
+      const updated = [...remoteRef.current, newItem];
+      remoteRef.current = updated;
+      setItems(updated);
+      try {
+        await supabase.from("profiles").update({ wardrobe_items: updated }).eq("id", userId);
+      } catch { /* silently ignore */ }
+    } else if (guestId) {
+      // Guest: localStorage
+      const guestWardrobeKey = `vesti_guest_${guestId}_wardrobe`;
+      const existing = tryParse(guestWardrobeKey, []);
+      const updated  = [...existing, newItem];
+      trySave(guestWardrobeKey, updated);
+      remoteRef.current = updated;
+      setItems(updated);
+    }
     return newItem;
-  }, [userId]);
+  }, [userId, isOwner, guestId]);
 
   return {
     items,

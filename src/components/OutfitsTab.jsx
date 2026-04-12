@@ -20,7 +20,8 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { T } from "../theme";
-import TRIP from "../data/trip";
+import { useTier } from "../contexts/AuthContext";
+import useTripStore from "../hooks/useTripStore";
 import { generateTripOutfits, generateSingleOutfit, buildTripItemPool } from "../utils/tripGenerator";
 import OutfitCard from "./OutfitCard";
 import ItemPicker from "./ItemPicker";
@@ -90,7 +91,7 @@ function eveningOcc(night) {
 }
 
 /* ─── Day List Row (desktop sidebar) ─────────────────────────────────────── */
-function DayRow({ day, active, hasOutfit, hasMissing, isFrozen, onClick }) {
+function DayRow({ day, active, hasOutfit, hasMissing, isFrozen, isLocked, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -101,6 +102,7 @@ function DayRow({ day, active, hasOutfit, hasMissing, isFrozen, onClick }) {
         borderRadius: 12, padding: "10px 12px",
         cursor: "pointer", transition: "background 0.15s",
         position: "relative",
+        opacity: isLocked ? 0.45 : 1,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -111,22 +113,25 @@ function DayRow({ day, active, hasOutfit, hasMissing, isFrozen, onClick }) {
           </div>
           <div style={{ fontSize: 9, color: T.light, marginTop: 1 }}>{day.date}</div>
         </div>
-        {hasMissing && <span title="Item removed" style={{ fontSize: 11 }}>⚠️</span>}
-        {isFrozen && !hasMissing && <span title="Outfit frozen" style={{ fontSize: 11 }}>🔒</span>}
-        {hasOutfit && !hasMissing && !isFrozen && (
+        {isLocked && <span title="Upgrade to unlock" style={{ fontSize: 11 }}>🔒</span>}
+        {!isLocked && hasMissing && <span title="Item removed" style={{ fontSize: 11 }}>⚠️</span>}
+        {!isLocked && isFrozen && !hasMissing && <span title="Outfit frozen" style={{ fontSize: 11 }}>🔒</span>}
+        {!isLocked && hasOutfit && !hasMissing && !isFrozen && (
           <div style={{ width: 6, height: 6, borderRadius: "50%", background: T.green, flexShrink: 0 }} />
         )}
       </div>
-      <div style={{ display: "flex", gap: 4, marginTop: 5, flexWrap: "wrap" }}>
-        <Chip text={day.w}   colors={wColors(day.w)} />
-        <Chip text={day.occ} colors={occColors(day.occ)} />
-      </div>
+      {!isLocked && (
+        <div style={{ display: "flex", gap: 4, marginTop: 5, flexWrap: "wrap" }}>
+          <Chip text={day.w}   colors={wColors(day.w)} />
+          <Chip text={day.occ} colors={occColors(day.occ)} />
+        </div>
+      )}
     </button>
   );
 }
 
 /* ─── Day Chip (mobile horizontal strip) ─────────────────────────────────── */
-function DayChip({ day, active, hasOutfit, hasMissing, isFrozen, onClick }) {
+function DayChip({ day, active, hasOutfit, hasMissing, isFrozen, isLocked, onClick }) {
   return (
     <button
       onClick={onClick}
@@ -137,16 +142,19 @@ function DayChip({ day, active, hasOutfit, hasMissing, isFrozen, onClick }) {
         borderRadius: 12, padding: "10px 12px",
         cursor: "pointer", textAlign: "center",
         minWidth: 52, transition: "background 0.15s",
+        opacity: isLocked ? 0.45 : 1,
       }}
     >
-      <div style={{ fontSize: 15, lineHeight: 1 }}>{day.e}</div>
+      <div style={{ fontSize: 15, lineHeight: 1 }}>{isLocked ? "🔒" : day.e}</div>
       <div style={{ fontSize: 8, fontWeight: active ? 700 : 600, color: active ? T.accent : T.text, marginTop: 3, letterSpacing: -0.2 }}>
         {day.id.replace("d", "D")}
       </div>
-      <div style={{
-        width: 5, height: 5, borderRadius: "50%", margin: "4px auto 0",
-        background: hasMissing ? "#FCD34D" : isFrozen ? "#60A5FA" : hasOutfit ? T.green : T.borderLight,
-      }} />
+      {!isLocked && (
+        <div style={{
+          width: 5, height: 5, borderRadius: "50%", margin: "4px auto 0",
+          background: hasMissing ? "#FCD34D" : isFrozen ? "#60A5FA" : hasOutfit ? T.green : T.borderLight,
+        }} />
+      )}
     </button>
   );
 }
@@ -348,6 +356,10 @@ export default function OutfitsTab({
   profilePhotos = [],     // string[] base64 data URIs — from useProfile in App.jsx
   onNavigateToProfile,    // () => void — navigate to Profile tab
 }) {
+  const { limits, isGuest } = useTier();
+  const { activeTrip } = useTripStore();
+  const TRIP = activeTrip?.days || [];
+
   const [selectedDay, setSelectedDay] = useState(TRIP[0]);
   const [aiLoading,   setAiLoading]   = useState(false);
   const [aiError,     setAiError]     = useState(null);
@@ -720,17 +732,27 @@ export default function OutfitsTab({
             display: "flex", gap: 6, paddingBottom: 4,
             WebkitOverflowScrolling: "touch",
           }}>
-            {TRIP.map((day) => (
-              <DayChip
-                key={day.id}
-                day={day}
-                active={selectedDay?.id === day.id}
-                hasOutfit={isPlannedDay(day.id)}
-                hasMissing={hasMissing(day.id)}
-                isFrozen={frozenDays[day.id] || false}
-                onClick={() => setSelectedDay(day)}
-              />
-            ))}
+            {TRIP.map((day, idx) => {
+              const isLocked = isGuest && idx >= limits.outfitDays;
+              return (
+                <DayChip
+                  key={day.id}
+                  day={day}
+                  active={selectedDay?.id === day.id}
+                  hasOutfit={isPlannedDay(day.id)}
+                  hasMissing={hasMissing(day.id)}
+                  isFrozen={frozenDays[day.id] || false}
+                  isLocked={isLocked}
+                  onClick={() => {
+                    if (isLocked) {
+                      window.dispatchEvent(new CustomEvent("vesti-limit-reached", { detail: { reason: "outfitDays" } }));
+                      return;
+                    }
+                    setSelectedDay(day);
+                  }}
+                />
+              );
+            })}
           </div>
         ) : (
           /* DESKTOP: vertical sidebar */
@@ -750,17 +772,27 @@ export default function OutfitsTab({
               DAYS · {plannedCount}/{TRIP.length}
             </div>
             <div style={{ overflowY: "auto", flex: 1, padding: 6 }}>
-              {TRIP.map((day) => (
-                <DayRow
-                  key={day.id}
-                  day={day}
-                  active={selectedDay?.id === day.id}
-                  hasOutfit={isPlannedDay(day.id)}
-                  hasMissing={hasMissing(day.id)}
-                  isFrozen={frozenDays[day.id] || false}
-                  onClick={() => setSelectedDay(day)}
-                />
-              ))}
+              {TRIP.map((day, idx) => {
+                const isLocked = isGuest && idx >= limits.outfitDays;
+                return (
+                  <DayRow
+                    key={day.id}
+                    day={day}
+                    active={selectedDay?.id === day.id}
+                    hasOutfit={isPlannedDay(day.id)}
+                    hasMissing={hasMissing(day.id)}
+                    isFrozen={frozenDays[day.id] || false}
+                    isLocked={isLocked}
+                    onClick={() => {
+                      if (isLocked) {
+                        window.dispatchEvent(new CustomEvent("vesti-limit-reached", { detail: { reason: "outfitDays" } }));
+                        return;
+                      }
+                      setSelectedDay(day);
+                    }}
+                  />
+                );
+              })}
             </div>
           </div>
         )}

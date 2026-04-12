@@ -8,7 +8,8 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useUser } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
+import { guestKey } from "./useGuestSession";
 import { supabase } from "../lib/supabase";
 
 /* ── Per-user storage key ──────────────────────────────────────────────────── */
@@ -16,9 +17,15 @@ function lsKey(userId) {
   return userId ? `vesti_${userId}_capsule_v1` : "vesti_capsule_v1";
 }
 
-function loadLocal(userId) {
+function effectiveLsKey(userId, guestId) {
+  if (userId) return `vesti_${userId}_capsule_v1`;
+  if (guestId) return guestKey(guestId, "capsule");
+  return "vesti_capsule_v1";
+}
+
+function loadLocal(userId, guestId) {
   try {
-    const raw = JSON.parse(localStorage.getItem(lsKey(userId)));
+    const raw = JSON.parse(localStorage.getItem(effectiveLsKey(userId, guestId)));
     if (Array.isArray(raw)) return new Set(raw);
     // Migrate from legacy key
     const legacy = JSON.parse(localStorage.getItem("wdb_capsule_v1"));
@@ -28,19 +35,19 @@ function loadLocal(userId) {
   }
 }
 
-function saveLocal(userId, ids) {
+function saveLocal(userId, guestId, ids) {
   try {
-    localStorage.setItem(lsKey(userId), JSON.stringify([...ids]));
+    localStorage.setItem(effectiveLsKey(userId, guestId), JSON.stringify([...ids]));
   } catch {}
 }
 
 /* ── Hook ─────────────────────────────────────────────────────────────────── */
 export default function useCapsule() {
-  const user   = useUser();
+  const { user, guestId } = useAuth();
   const userId = user?.id ?? null;
 
-  const [capsuleIds, _setCapsuleIds] = useState(() => loadLocal(userId));
-  const capsuleRef  = useRef(loadLocal(userId));
+  const [capsuleIds, _setCapsuleIds] = useState(() => loadLocal(userId, guestId));
+  const capsuleRef  = useRef(loadLocal(userId, guestId));
   const syncTimer   = useRef(null);
 
   /* ── Push to Supabase (debounced 500ms) ── */
@@ -70,14 +77,14 @@ export default function useCapsule() {
       if (!data || !Array.isArray(data.capsule_ids)) return;
       const next = new Set(data.capsule_ids);
       capsuleRef.current = next;
-      saveLocal(userId, next);
+      saveLocal(userId, guestId, next);
       _setCapsuleIds(next);
     } catch {}
-  }, [userId]);
+  }, [userId, guestId]);
 
-  /* ── On userId change: load local, sync with remote ── */
+  /* ── On userId/guestId change: load local, sync with remote ── */
   useEffect(() => {
-    const local = loadLocal(userId);
+    const local = loadLocal(userId, guestId);
     capsuleRef.current = local;
     _setCapsuleIds(local);
 
@@ -103,25 +110,25 @@ export default function useCapsule() {
           // Remote has data — use it (remote wins)
           const next = new Set(data.capsule_ids);
           capsuleRef.current = next;
-          saveLocal(userId, next);
+          saveLocal(userId, guestId, next);
           _setCapsuleIds(next);
         }
       } catch {}
     })();
-  }, [userId]);
+  }, [userId, guestId]);
 
   /* ── Reload after one-time data migration ── */
   useEffect(() => {
     function handleMigration(e) {
       if (e.detail?.userId !== userId) return;
-      const local = loadLocal(userId);
+      const local = loadLocal(userId, guestId);
       capsuleRef.current = local;
       _setCapsuleIds(local);
       pushToBackend(local);
     }
     window.addEventListener("vesti-data-migrated", handleMigration);
     return () => window.removeEventListener("vesti-data-migrated", handleMigration);
-  }, [userId, pushToBackend]);
+  }, [userId, guestId, pushToBackend]);
 
   useEffect(() => {
     window.addEventListener("focus", fetchFromBackend);
@@ -138,27 +145,27 @@ export default function useCapsule() {
       const next = new Set(prev);
       if (next.has(id)) { next.delete(id); } else { next.add(id); }
       capsuleRef.current = next;
-      saveLocal(userId, next);
+      saveLocal(userId, guestId, next);
       pushToBackend(next);
       return next;
     });
-  }, [pushToBackend, userId]);
+  }, [pushToBackend, userId, guestId]);
 
   const setManyCapsule = useCallback((ids) => {
     const next = new Set(ids);
     capsuleRef.current = next;
-    saveLocal(userId, next);
+    saveLocal(userId, guestId, next);
     pushToBackend(next);
     _setCapsuleIds(next);
-  }, [pushToBackend, userId]);
+  }, [pushToBackend, userId, guestId]);
 
   const clearCapsule = useCallback(() => {
     const next = new Set();
     capsuleRef.current = next;
-    saveLocal(userId, next);
+    saveLocal(userId, guestId, next);
     pushToBackend(next);
     _setCapsuleIds(next);
-  }, [pushToBackend, userId]);
+  }, [pushToBackend, userId, guestId]);
 
   return { capsuleIds, toggleCapsule, setManyCapsule, clearCapsule };
 }
