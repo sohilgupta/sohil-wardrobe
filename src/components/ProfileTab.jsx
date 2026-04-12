@@ -8,14 +8,14 @@
 
 import { useState } from "react";
 import { T } from "../theme";
-import { useAuth, usePlan } from "../contexts/AuthContext";
+import { useAuth, useTier } from "../contexts/AuthContext";
 
 /* ── One-time migration export script (user runs this on sohil-wardrobe.vercel.app) ── */
 const EXPORT_SCRIPT = `copy(JSON.stringify({v:1,capsule:JSON.parse(localStorage.getItem("wdb_capsule_v1")||"[]"),outfits:JSON.parse(localStorage.getItem("wdb_outfits_v3")||localStorage.getItem("wdb_outfits_v1")||"{}")}))`;
 
 export default function ProfileTab({ photos, onAdd, onRemove, onClearAll, maxPhotos, onImportData }) {
   const { user, signOut } = useAuth();
-  const { isPro } = usePlan();
+  const { isPro, tier, limits } = useTier();
   const [upgrading,    setUpgrading]    = useState(false);
   const [importJson,   setImportJson]   = useState("");
   const [importStatus, setImportStatus] = useState(null); // null | "ok" | "error"
@@ -127,17 +127,17 @@ export default function ProfileTab({ photos, onAdd, onRemove, onClearAll, maxPho
           }}
         >
           <p style={{ fontSize: 11, color: "#C084FC", fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
-            FREE TIER LIMITS
+            {tier === "guest" ? "GUEST LIMITS" : "FREE TIER LIMITS"}
           </p>
           <ul style={{ fontSize: 12, color: T.mid, lineHeight: 1.8, paddingLeft: 14 }}>
-            <li>1 trip</li>
-            <li>10 wardrobe items</li>
-            <li>3 days of outfit planning</li>
-            <li>Basic AI generation</li>
-            <li>Exports include watermark</li>
+            <li>{limits.trips === Infinity ? "Unlimited" : limits.trips} trip{limits.trips !== 1 ? "s" : ""}</li>
+            <li>{limits.wardrobe === Infinity ? "Unlimited" : limits.wardrobe} wardrobe items</li>
+            <li>{limits.outfitDays === Infinity ? "Unlimited" : limits.outfitDays} days of outfit planning</li>
+            {tier === "guest" && <li>No cross-device sync</li>}
+            {tier === "free"  && <li>Basic AI generation</li>}
           </ul>
           <p style={{ fontSize: 12, color: T.light, marginTop: 10 }}>
-            Upgrade to Pro for unlimited everything.
+            {tier === "guest" ? "Create a free account to sync across devices." : "Upgrade to Pro for unlimited everything."}
           </p>
         </div>
       )}
