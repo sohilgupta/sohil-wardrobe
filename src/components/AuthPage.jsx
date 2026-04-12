@@ -229,6 +229,105 @@ export default function AuthPage() {
   );
 }
 
+export function AuthForm({ compact = false }) {
+  const [mode,    setMode]    = useState("landing");
+  const [email,   setEmail]   = useState("");
+  const [error,   setError]   = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleGoogle() {
+    if (!supabaseConfigured) { setError("Supabase not configured."); return; }
+    setError(""); setLoading(true);
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: "google", options: { redirectTo: window.location.origin },
+    });
+    if (err) { setError(err.message); setLoading(false); }
+  }
+
+  async function handleEmailOTP(e) {
+    e.preventDefault();
+    if (!email || !supabaseConfigured) return;
+    setError(""); setLoading(true);
+    try {
+      const { error: err } = await supabase.auth.signInWithOtp({
+        email, options: { emailRedirectTo: window.location.origin },
+      });
+      if (err) throw err;
+      setMode("otp_sent");
+    } catch (err) {
+      setError(err.message || "Failed to send login link.");
+    } finally { setLoading(false); }
+  }
+
+  const pad = compact ? "10px 14px" : "14px 16px";
+  const fs  = compact ? 13 : 14;
+
+  if (mode === "otp_sent") {
+    return (
+      <div style={{ textAlign: "center" }}>
+        <p style={{ fontSize: 28, marginBottom: 12 }}>✉️</p>
+        <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 8 }}>Check your inbox</p>
+        <p style={{ fontSize: 12, color: T.mid, lineHeight: 1.7, marginBottom: 20 }}>
+          Magic link sent to <strong style={{ color: T.text }}>{email}</strong>
+        </p>
+        <button onClick={() => { setMode("email"); setError(""); }}
+          style={{ background: "none", border: "none", color: T.mid, fontSize: 12, cursor: "pointer" }}>
+          Use a different email
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <button onClick={handleGoogle} disabled={loading}
+        style={{ width: "100%", padding: pad, background: T.text, color: T.bg, border: "none",
+          borderRadius: 10, fontSize: fs, fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 10,
+          opacity: loading ? 0.6 : 1, fontFamily: "inherit" }}>
+        <GoogleIcon /> Continue with Google
+      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+        <div style={{ flex: 1, height: 1, background: T.border }} />
+        <span style={{ fontSize: 10, color: T.light, letterSpacing: 1.5 }}>OR</span>
+        <div style={{ flex: 1, height: 1, background: T.border }} />
+      </div>
+      {mode === "email" ? (
+        <form onSubmit={handleEmailOTP}>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+            placeholder="your@email.com" autoFocus autoComplete="email"
+            style={{ width: "100%", padding: "10px 14px", background: T.alt,
+              border: `1px solid ${error ? "#EF4444" : T.border}`, borderRadius: 8,
+              color: T.text, fontSize: 14, marginBottom: 8, fontFamily: "inherit" }} />
+          {error && <p style={{ color: "#EF4444", fontSize: 11, marginBottom: 8 }}>{error}</p>}
+          <button type="submit" disabled={loading || !email}
+            style={{ width: "100%", padding: pad, background: T.accentDim, color: T.accent,
+              border: `1px solid ${T.accentBorder}`, borderRadius: 8, fontSize: fs, fontWeight: 600,
+              cursor: loading || !email ? "not-allowed" : "pointer",
+              opacity: loading || !email ? 0.5 : 1, marginBottom: 6, fontFamily: "inherit" }}>
+            {loading ? "Sending…" : "Send magic link"}
+          </button>
+          <button type="button" onClick={() => { setMode("landing"); setError(""); }}
+            style={{ background: "none", border: "none", color: T.light, fontSize: 11,
+              cursor: "pointer", width: "100%", textAlign: "center" }}>
+            Back
+          </button>
+        </form>
+      ) : (
+        <>
+          <button onClick={() => setMode("email")}
+            style={{ width: "100%", padding: pad, background: "none", color: T.mid,
+              border: `1px solid ${T.border}`, borderRadius: 10, fontSize: fs,
+              fontWeight: 500, cursor: "pointer", fontFamily: "inherit" }}>
+            Continue with Email
+          </button>
+          {error && <p style={{ color: "#EF4444", fontSize: 11, marginTop: 8, textAlign: "center" }}>{error}</p>}
+        </>
+      )}
+    </>
+  );
+}
+
 function GoogleIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">

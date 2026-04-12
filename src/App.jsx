@@ -12,6 +12,7 @@ import PackTab from "./components/PackTab";
 import OutfitsTab from "./components/OutfitsTab";
 import CapsuleTab from "./components/CapsuleTab";
 import ProfileTab from "./components/ProfileTab";
+import UpgradePrompt from "./components/UpgradePrompt";
 
 const NAV = [
   { id: "wardrobe", icon: "⊞", label: "WARDROBE" },
@@ -221,6 +222,7 @@ function AuthenticatedApp({ onLogout }) {
 
       {/* Footer */}
       <AppFooter />
+      <UpgradePrompt />
     </div>
   );
 }
