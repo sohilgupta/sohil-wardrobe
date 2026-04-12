@@ -11,7 +11,7 @@
 
 import { useState, useMemo } from "react";
 import { T, swatch } from "../theme";
-import TRIP from "../data/trip";
+import useTripStore from "../hooks/useTripStore";
 import { optimizePackingWithAI } from "../utils/tripGenerator";
 
 const LAYER_ORDER = ["Base", "Mid", "Outer", "Bottom", "Footwear"];
@@ -26,6 +26,9 @@ const LAYER_ICON = { Base: "👕", Mid: "🧶", Outer: "🧥", Bottom: "👖", F
 
 /* ─── PACKING LIST ─────────────────────────────────────────────────────────── */
 export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, frozenDays = {}, capsuleIds }) {
+  const { activeTrip } = useTripStore();
+  const TRIP = activeTrip?.days || [];
+
   const [checked, setChecked] = useState({});
 
   /* ── Optimizer state ── */
