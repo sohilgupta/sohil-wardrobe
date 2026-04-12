@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { T } from "./theme";
-import { AuthProvider, useAuth, usePlan } from "./contexts/AuthContext";
+import { AuthProvider, useAuth, useTier } from "./contexts/AuthContext";
 import useWardrobe from "./hooks/useWardrobe";
 import useOutfits from "./hooks/useOutfits";
 import useCapsule from "./hooks/useCapsule";
@@ -12,7 +12,6 @@ import PackTab from "./components/PackTab";
 import OutfitsTab from "./components/OutfitsTab";
 import CapsuleTab from "./components/CapsuleTab";
 import ProfileTab from "./components/ProfileTab";
-import AuthPage from "./components/AuthPage";
 
 const NAV = [
   { id: "wardrobe", icon: "⊞", label: "WARDROBE" },
@@ -35,7 +34,7 @@ export default function App() {
 
 /* ─── INNER — reads auth state after provider is mounted ──────────────────── */
 function AppInner() {
-  const { user, loading, signOut } = useAuth();
+  const { loading, signOut } = useAuth();
 
   if (loading) {
     return (
@@ -48,10 +47,8 @@ function AppInner() {
     );
   }
 
-  if (!user) {
-    return <AuthPage />;
-  }
-
+  // Guests and logged-in users both proceed into the app.
+  // UpgradePrompt handles auth/upgrade flow when limits are hit.
   return <AuthenticatedApp onLogout={signOut} />;
 }
 
@@ -59,7 +56,7 @@ function AppInner() {
 function AuthenticatedApp({ onLogout }) {
   const [tab, setTab] = useState("wardrobe");
   const [focusDayId, setFocusDayId] = useState(null);
-  const { isPro } = usePlan();
+  const { isPro, tier } = useTier();
 
   const {
     items:      wardrobe,
