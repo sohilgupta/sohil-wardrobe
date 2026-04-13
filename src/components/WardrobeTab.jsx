@@ -1,8 +1,9 @@
 import { useState, useMemo } from "react";
 import { T } from "../theme";
-import { useTier } from "../contexts/AuthContext";
+import { useTier, useAuth } from "../contexts/AuthContext";
 import ItemVisual from "./ItemVisual";
 import Chip from "./Chip";
+import GuestLanding from "./GuestLanding";
 
 /* ─── shared input style ─────────────────────────────────────────────────── */
 const INPUT = {
@@ -91,8 +92,12 @@ export default function WardrobeTab({
   syncStatus,
   lastSync,
   onSync,
+  isDemoMode = false,
+  onTryDemo,
 }) {
   const { limits, isPro } = useTier();
+  const { isGuest } = useAuth();
+  const showLanding = isGuest && wardrobe.length === 0 && !isDemoMode;
 
   /* ── derived filter options ── */
   const cats   = useMemo(() => [...new Set(wardrobe.map((i) => i.c))].sort(),  [wardrobe]);
@@ -193,87 +198,153 @@ export default function WardrobeTab({
 
   return (
     <div>
-      {/* ── Apple Marketing Hero ── */}
-      <div style={{ marginBottom: 28 }}>
-        <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
-          Your Collection
-        </p>
-        <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
-          {wardrobe.length} Pieces.
-          {!isPro && (
-            <span style={{ fontSize: 11, color: "#9CA3AF", marginLeft: 8 }}>
-              ({wardrobe.length}/{limits.wardrobe === Infinity ? "\u221e" : limits.wardrobe})
-            </span>
-          )}
-        </p>
-        <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
-          {wardrobe.filter(i => i.t === "Yes").length} travel-ready · {[...new Set(wardrobe.map(i => i.c))].length} categories
-        </p>
-      </div>
-
-      {/* ── Search + sync ── */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
-        <div style={{ position: "relative", flex: 1 }}>
-          <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.light, fontSize: 16 }}>⌕</span>
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, color, brand, code…"
-            style={{
-              width: "100%",
-              padding: "11px 14px",
-              background: T.alt,
-              border: `1.5px solid ${T.border}`,
-              borderRadius: 12,
-              fontSize: 13,
-              color: T.text,
-              outline: "none",
-              boxSizing: "border-box",
-              fontFamily: "'Inter','Helvetica Neue',sans-serif",
-            }} />
+      {/* ── Hero / Guest Landing ── */}
+      {showLanding ? (
+        <GuestLanding
+          onAddItem={() => setAdding(true)}
+          onTryDemo={onTryDemo}
+        />
+      ) : (
+        <div style={{ marginBottom: 28 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: T.accent, marginBottom: 6 }}>
+            Your Collection
+          </p>
+          <p style={{ fontSize: 30, fontWeight: 800, letterSpacing: -0.8, color: T.text, lineHeight: 1.1, marginBottom: 6 }}>
+            {wardrobe.length} Pieces.
+            {!isPro && (
+              <span style={{ fontSize: 11, color: "#9CA3AF", marginLeft: 8 }}>
+                ({wardrobe.length}/{limits.wardrobe === Infinity ? "\u221e" : limits.wardrobe})
+              </span>
+            )}
+          </p>
+          <p style={{ fontSize: 14, color: T.mid, fontWeight: 400 }}>
+            {wardrobe.filter(i => i.t === "Yes").length} travel-ready · {[...new Set(wardrobe.map(i => i.c))].length} categories
+          </p>
         </div>
-        <SyncBadge status={syncStatus} lastSync={lastSync} onSync={onSync} />
-      </div>
+      )}
 
-      {/* ── Filters ── */}
-      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-        <select value={cat} onChange={(e) => setCat(e.target.value)}
-          style={{ ...selStyle, backgroundColor: selBg(cat), color: selColor(cat), border: selBorder(cat), backgroundImage: selArrow(cat) }}>
-          <option value="">Category</option>
-          {cats.map((o) => <option key={o}>{o}</option>)}
-        </select>
+      {!showLanding && (
+        <>
+          {/* ── Search + sync ── */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+            <div style={{ position: "relative", flex: 1 }}>
+              <span style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: T.light, fontSize: 16 }}>⌕</span>
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, color, brand, code…"
+                style={{
+                  width: "100%",
+                  padding: "11px 14px",
+                  background: T.alt,
+                  border: `1.5px solid ${T.border}`,
+                  borderRadius: 12,
+                  fontSize: 13,
+                  color: T.text,
+                  outline: "none",
+                  boxSizing: "border-box",
+                  fontFamily: "'Inter','Helvetica Neue',sans-serif",
+                }} />
+            </div>
+            <SyncBadge status={syncStatus} lastSync={lastSync} onSync={onSync} />
+          </div>
 
-        <select value={col} onChange={(e) => setCol(e.target.value)}
-          style={{ ...selStyle, backgroundColor: selBg(col), color: selColor(col), border: selBorder(col), backgroundImage: selArrow(col) }}>
-          <option value="">Color</option>
-          {colors.map((o) => <option key={o}>{o}</option>)}
-        </select>
+          {/* ── Filters ── */}
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+            <select value={cat} onChange={(e) => setCat(e.target.value)}
+              style={{ ...selStyle, backgroundColor: selBg(cat), color: selColor(cat), border: selBorder(cat), backgroundImage: selArrow(cat) }}>
+              <option value="">Category</option>
+              {cats.map((o) => <option key={o}>{o}</option>)}
+            </select>
 
-        <select value={occ} onChange={(e) => setOcc(e.target.value)}
-          style={{ ...selStyle, backgroundColor: selBg(occ), color: selColor(occ), border: selBorder(occ), backgroundImage: selArrow(occ) }}>
-          <option value="">Occasion</option>
-          {["Casual", "Dinner", "Flight", "Hiking", "Gym", "Formal"].map((o) => <option key={o}>{o}</option>)}
-        </select>
+            <select value={col} onChange={(e) => setCol(e.target.value)}
+              style={{ ...selStyle, backgroundColor: selBg(col), color: selColor(col), border: selBorder(col), backgroundImage: selArrow(col) }}>
+              <option value="">Color</option>
+              {colors.map((o) => <option key={o}>{o}</option>)}
+            </select>
 
-        <select value={wth} onChange={(e) => setWth(e.target.value)}
-          style={{ ...selStyle, backgroundColor: selBg(wth), color: selColor(wth), border: selBorder(wth), backgroundImage: selArrow(wth) }}>
-          <option value="">Weather</option>
-          {["Cold", "Mild", "Warm"].map((o) => <option key={o}>{o}</option>)}
-        </select>
+            <select value={occ} onChange={(e) => setOcc(e.target.value)}
+              style={{ ...selStyle, backgroundColor: selBg(occ), color: selColor(occ), border: selBorder(occ), backgroundImage: selArrow(occ) }}>
+              <option value="">Occasion</option>
+              {["Casual", "Dinner", "Flight", "Hiking", "Gym", "Formal"].map((o) => <option key={o}>{o}</option>)}
+            </select>
 
-        {hasFilter && (
-          <button onClick={() => { setCat(""); setCol(""); setOcc(""); setWth(""); setQ(""); }}
-            style={{ padding: "7px 14px", background: "none", border: `1.5px solid ${T.border}`, borderRadius: 20, fontSize: 12, color: T.mid, cursor: "pointer" }}>
-            Clear ×
-          </button>
-        )}
-      </div>
+            <select value={wth} onChange={(e) => setWth(e.target.value)}
+              style={{ ...selStyle, backgroundColor: selBg(wth), color: selColor(wth), border: selBorder(wth), backgroundImage: selArrow(wth) }}>
+              <option value="">Weather</option>
+              {["Cold", "Mild", "Warm"].map((o) => <option key={o}>{o}</option>)}
+            </select>
 
-      {/* ── Count + Add ── */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-        <p style={{ fontSize: 12, color: T.light }}>{f.length} of {wardrobe.length} items</p>
-        <button onClick={openAdd}
-          style={{ padding: "6px 14px", background: T.text, color: T.bg, border: "none", borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5 }}>
-          + Add Item
-        </button>
-      </div>
+            {hasFilter && (
+              <button onClick={() => { setCat(""); setCol(""); setOcc(""); setWth(""); setQ(""); }}
+                style={{ padding: "7px 14px", background: "none", border: `1.5px solid ${T.border}`, borderRadius: 20, fontSize: 12, color: T.mid, cursor: "pointer" }}>
+                Clear ×
+              </button>
+            )}
+          </div>
+
+          {/* ── Count + Add ── */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <p style={{ fontSize: 12, color: T.light }}>{f.length} of {wardrobe.length} items</p>
+            <button onClick={openAdd}
+              style={{ padding: "6px 14px", background: T.text, color: T.bg, border: "none", borderRadius: 20, fontSize: 11, fontWeight: 700, cursor: "pointer", letterSpacing: 0.5 }}>
+              + Add Item
+            </button>
+          </div>
+
+          {/* ── Grid ── */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 14 }}>
+            {f.map((item) => (
+              <div key={item.id} onClick={() => openDetail(item)} className="wardrobe-card" style={{ cursor: "pointer", borderRadius: "16px", overflow: "hidden" }}>
+                <div style={{ position: "relative" }}>
+                  <ItemVisual item={item} size={140} />
+                  {item.t === "Yes" && (
+                    <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6, letterSpacing: 0.5 }}>✈</div>
+                  )}
+                  {item._source === "local" && (
+                    <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(60,20,100,0.85)", color: "#A78BFA", fontSize: 8, fontWeight: 700, padding: "2px 5px", borderRadius: 5 }}>LOCAL</div>
+                  )}
+                  {item.productUrl && (
+                    <a
+                      href={item.productUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      title="View product"
+                      style={{
+                        position: "absolute", bottom: 6, right: 6,
+                        background: "rgba(0,0,0,0.65)",
+                        color: "#E8E6E1",
+                        fontSize: 10,
+                        padding: "2px 5px",
+                        borderRadius: 6,
+                        textDecoration: "none",
+                        lineHeight: 1,
+                      }}
+                    >
+                      ↗
+                    </a>
+                  )}
+                </div>
+                <div style={{ padding: "12px 14px 14px" }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: T.mid, marginBottom: 4 }}>
+                    {item.c}
+                  </p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, lineHeight: 1.3, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+                    {item.n || item.itemName}
+                  </p>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                    <Chip text={item.col || item.color} />
+                    <Chip text={item.w} colors={T.weather[item.w]} />
+                    {item.price && (
+                      <span style={{ fontSize: 12, color: T.accent, fontWeight: 700 }}>
+                        ₹{Number(item.price).toLocaleString("en-IN")}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* ── Detail sheet ── */}
       {detail && (
@@ -445,60 +516,6 @@ export default function WardrobeTab({
         </div>
       )}
 
-      {/* ── Grid ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(148px,1fr))", gap: 14 }}>
-        {f.map((item) => (
-          <div key={item.id} onClick={() => openDetail(item)} className="wardrobe-card" style={{ cursor: "pointer", borderRadius: "16px", overflow: "hidden" }}>
-            <div style={{ position: "relative" }}>
-              <ItemVisual item={item} size={140} />
-              {item.t === "Yes" && (
-                <div style={{ position: "absolute", top: 8, right: 8, background: "rgba(0,0,0,0.6)", color: "#fff", fontSize: 9, fontWeight: 700, padding: "2px 6px", borderRadius: 6, letterSpacing: 0.5 }}>✈</div>
-              )}
-              {item._source === "local" && (
-                <div style={{ position: "absolute", top: 8, left: 8, background: "rgba(60,20,100,0.85)", color: "#A78BFA", fontSize: 8, fontWeight: 700, padding: "2px 5px", borderRadius: 5 }}>LOCAL</div>
-              )}
-              {item.productUrl && (
-                <a
-                  href={item.productUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  title="View product"
-                  style={{
-                    position: "absolute", bottom: 6, right: 6,
-                    background: "rgba(0,0,0,0.65)",
-                    color: "#E8E6E1",
-                    fontSize: 10,
-                    padding: "2px 5px",
-                    borderRadius: 6,
-                    textDecoration: "none",
-                    lineHeight: 1,
-                  }}
-                >
-                  ↗
-                </a>
-              )}
-            </div>
-            <div style={{ padding: "12px 14px 14px" }}>
-              <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.1em", textTransform: "uppercase", color: T.mid, marginBottom: 4 }}>
-                {item.c}
-              </p>
-              <p style={{ fontSize: 13, fontWeight: 600, color: T.text, letterSpacing: -0.1, lineHeight: 1.3, marginBottom: 8, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                {item.n || item.itemName}
-              </p>
-              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-                <Chip text={item.col || item.color} />
-                <Chip text={item.w} colors={T.weather[item.w]} />
-                {item.price && (
-                  <span style={{ fontSize: 12, color: T.accent, fontWeight: 700 }}>
-                    ₹{Number(item.price).toLocaleString("en-IN")}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
     </div>
   );
 }
