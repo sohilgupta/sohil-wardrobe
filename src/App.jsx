@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { T } from "./theme";
 import { AuthProvider, useAuth, useTier } from "./contexts/AuthContext";
 import useWardrobe from "./hooks/useWardrobe";
@@ -13,6 +13,7 @@ import OutfitsTab from "./components/OutfitsTab";
 import CapsuleTab from "./components/CapsuleTab";
 import ProfileTab from "./components/ProfileTab";
 import UpgradePrompt from "./components/UpgradePrompt";
+import { loadDemo, clearDemo, isDemoActive } from "./utils/demoData";
 
 const NAV = [
   { id: "wardrobe", icon: "⊞", label: "WARDROBE" },
@@ -58,6 +59,36 @@ function AuthenticatedApp({ onLogout }) {
   const [tab, setTab] = useState("wardrobe");
   const [focusDayId, setFocusDayId] = useState(null);
   const { isPro, tier, isGuest } = useTier();
+  const { guestId } = useAuth();
+
+  // Demo mode: read from localStorage on mount, update on demo events
+  const [isDemoMode, setIsDemoMode] = useState(() => isDemoActive(guestId));
+
+  // Keep isDemoMode in sync when demo loads/clears
+  useEffect(() => {
+    function onDemoLoaded() { setIsDemoMode(true); }
+    function onDemoCleared() { setIsDemoMode(false); }
+    window.addEventListener("vesti-demo-loaded",  onDemoLoaded);
+    window.addEventListener("vesti-demo-cleared", onDemoCleared);
+    return () => {
+      window.removeEventListener("vesti-demo-loaded",  onDemoLoaded);
+      window.removeEventListener("vesti-demo-cleared", onDemoCleared);
+    };
+  }, []);
+
+  function handleTryDemo() {
+    if (guestId) {
+      loadDemo(guestId);
+      setTab("daily");
+    }
+  }
+
+  function handleClearDemo() {
+    if (guestId) {
+      clearDemo(guestId);
+      setTab("wardrobe");
+    }
+  }
 
   const {
     items:      wardrobe,
@@ -110,6 +141,7 @@ function AuthenticatedApp({ onLogout }) {
         ::placeholder{color:${T.light};}
         @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes slideUpFade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
         .wardrobe-card{transition:transform 0.18s ease,box-shadow 0.18s ease;border-radius:16px;}
         .wardrobe-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,0.5);}
         .nav-tab{transition:background 0.15s;}
@@ -127,6 +159,21 @@ function AuthenticatedApp({ onLogout }) {
               {isPro && (
                 <span style={{ fontSize: 9, color: T.accent, letterSpacing: 1.5, fontWeight: 700, background: T.accentDim, border: `1px solid ${T.accentBorder}`, padding: "2px 7px", borderRadius: 20 }}>
                   PRO
+                </span>
+              )}
+              {isGuest && isDemoMode && (
+                <span
+                  onClick={handleClearDemo}
+                  title="You're in demo mode — click to clear"
+                  style={{
+                    fontSize: 8, fontWeight: 700, letterSpacing: 1, cursor: "pointer",
+                    color: "#FBBF24",
+                    background: "rgba(251,191,36,0.12)",
+                    border: "1px solid rgba(251,191,36,0.25)",
+                    borderRadius: 20, padding: "2px 7px",
+                  }}
+                >
+                  DEMO
                 </span>
               )}
             </div>
@@ -196,6 +243,8 @@ function AuthenticatedApp({ onLogout }) {
             onEdit={editItem}
             onDelete={deleteItem}
             onAdd={addItem}
+            isDemoMode={isDemoMode}
+            onTryDemo={handleTryDemo}
           />
         )}
         {tab === "capsule" && (
@@ -210,7 +259,7 @@ function AuthenticatedApp({ onLogout }) {
           />
         )}
         {tab === "trip"    && <TripTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} onNavigateToDay={navigateToDay} capsuleIds={capsuleIds} />}
-        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} toggleFreeze={toggleFreeze} focusDayId={focusDayId} onFocusConsumed={() => setFocusDayId(null)} capsuleIds={capsuleIds} profilePhotos={profilePhotos} onNavigateToProfile={navigateToProfile} />}
+        {tab === "daily"   && <OutfitsTab wardrobe={wardrobe} loading={wLoading} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} toggleFreeze={toggleFreeze} focusDayId={focusDayId} onFocusConsumed={() => setFocusDayId(null)} capsuleIds={capsuleIds} profilePhotos={profilePhotos} onNavigateToProfile={navigateToProfile} isDemoMode={isDemoMode} />}
         {tab === "outfit"  && <OutfitTab  wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} capsuleIds={capsuleIds} />}
         {tab === "packing" && <PackTab    wardrobe={wardrobe} outfitIds={outfitIds} setOutfitIds={setOutfitIds} frozenDays={frozenDays} capsuleIds={capsuleIds} />}
         {tab === "profile" && (
