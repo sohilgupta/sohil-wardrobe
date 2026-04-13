@@ -182,6 +182,23 @@ export default function useTripStore() {
     return () => window.removeEventListener("vesti-data-migrated", handleMigration);
   }, [userId]);
 
+  /* ── Reload on demo load/clear ── */
+  useEffect(() => {
+    async function reload() {
+      if (localKey) {
+        const local = readLocalTrips(localKey);
+        setTrips(local);
+        setActiveTripId(local[0]?.id || null);
+      }
+    }
+    window.addEventListener("vesti-demo-loaded",  reload);
+    window.addEventListener("vesti-demo-cleared", reload);
+    return () => {
+      window.removeEventListener("vesti-demo-loaded",  reload);
+      window.removeEventListener("vesti-demo-cleared", reload);
+    };
+  }, [localKey]);
+
   /* ── API ── */
 
   const createTrip = useCallback((name, startDate, endDate) => {

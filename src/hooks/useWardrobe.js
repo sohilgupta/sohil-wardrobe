@@ -224,6 +224,17 @@ export default function useWardrobe() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
+  /* ── Reload on demo load/clear ── */
+  useEffect(() => {
+    const handler = () => sync();
+    window.addEventListener("vesti-demo-loaded",  handler);
+    window.addEventListener("vesti-demo-cleared", handler);
+    return () => {
+      window.removeEventListener("vesti-demo-loaded",  handler);
+      window.removeEventListener("vesti-demo-cleared", handler);
+    };
+  }, [sync]);
+
   /* ─── Mutation helpers ─────────────────────────────────────────────────── */
 
   const editItem = useCallback((id, updates) => {
