@@ -12,10 +12,10 @@ import {
 
 describe("validateUrl", () => {
   it("accepts a valid https URL and returns cleaned string", () => {
-    expect(() => validateUrl("https://www.zara.com/product/123")).not.toThrow();
+    expect(validateUrl("https://www.zara.com/product/123")).toBe("https://www.zara.com/product/123");
   });
   it("accepts http URLs", () => {
-    expect(() => validateUrl("http://myntra.com/product/456")).not.toThrow();
+    expect(validateUrl("http://myntra.com/product/456")).toBe("http://myntra.com/product/456");
   });
   it("rejects malformed URL", () => {
     expect(() => validateUrl("not-a-url")).toThrow("Invalid URL");
@@ -244,6 +244,14 @@ describe("fetchProductDetails", () => {
       json: async () => ({ error: "Rate limit" }),
     });
     const result = await fetchProductDetails("https://zara.com/product/1");
+    expect(result.partial).toEqual({});
+  });
+
+  it("returns { ok: false, error: 'Network error', partial: {} } when fetch throws", async () => {
+    fetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const result = await fetchProductDetails("https://zara.com/product/1");
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("Network error");
     expect(result.partial).toEqual({});
   });
 });

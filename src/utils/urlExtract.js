@@ -98,11 +98,16 @@ export function isSufficient(obj) {
 
 /* ─── Client fetch helper ────────────────────────────────────────────────── */
 export async function fetchProductDetails(url) {
-  const res = await fetch("/api/extract-product", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
-  });
+  let res;
+  try {
+    res = await fetch("/api/extract-product", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    });
+  } catch {
+    return { ok: false, error: "Network error", partial: {} };
+  }
   const data = await res.json();
   if (!res.ok) {
     return { ok: false, error: data.error, partial: data.partial || {} };
