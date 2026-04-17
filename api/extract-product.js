@@ -220,7 +220,7 @@ export default async function handler(req, res) {
   const ip = rawIp.split(",")[0].trim();
   const rl = checkRateLimit(ip);
   if (!rl.allowed) {
-    return res.status(429).json({ error: `Rate limit. Retry after ${rl.retryAfter} seconds.` });
+    return res.status(429).json({ error: "Rate limit.", retryAfter: rl.retryAfter });
   }
 
   // Validate URL
