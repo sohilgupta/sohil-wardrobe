@@ -1,9 +1,10 @@
 {
   "framework": "vite",
   "functions": {
-    "api/ai.js":              { "maxDuration": 60 },
-    "api/stripe/checkout.js": { "maxDuration": 30 },
-    "api/stripe/webhook.js":  { "maxDuration": 30 },
-    "api/stripe/portal.js":   { "maxDuration": 30 }
+    "api/ai.js":                 { "maxDuration": 60 },
+    "api/extract-product.js":    { "maxDuration": 20 },
+    "api/stripe/checkout.js":    { "maxDuration": 30 },
+    "api/stripe/webhook.js":     { "maxDuration": 30 },
+    "api/stripe/portal.js":      { "maxDuration": 30 }
   }
 }
