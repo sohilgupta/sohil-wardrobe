@@ -32,6 +32,7 @@ function checkRateLimit(ip) {
 }
 
 /* ─── URL validation ─────────────────────────────────────────────────────── */
+// mirrors src/utils/urlExtract.js — duplicated to keep this serverless function self-contained
 const BLOCKED_HOSTS = [
   /^localhost$/i,
   /^127\./,
@@ -52,6 +53,7 @@ function validateUrl(rawUrl) {
 }
 
 /* ─── Category / layer mapping ───────────────────────────────────────────── */
+// mirrors src/utils/urlExtract.js
 const LAYER_MAP = [
   { pattern: /t-?shirt|tee|shirt|blouse|top|polo/i,        l: "Base",     c: "Shirts"   },
   { pattern: /sweater|sweatshirt|hoodie|knit|pullover/i,    l: "Mid",      c: "Knitwear" },
@@ -67,6 +69,7 @@ function mapCategory(raw) {
 }
 
 /* ─── HTML parsers ───────────────────────────────────────────────────────── */
+// mirrors src/utils/urlExtract.js
 function parseOgTags(html) {
   const result = {};
   for (const [tag] of html.matchAll(/<meta[^>]+>/gi)) {
@@ -86,6 +89,7 @@ function parseOgTags(html) {
   return result;
 }
 
+// mirrors src/utils/urlExtract.js
 function parseJsonLd(html) {
   const result = {};
   for (const [, json] of html.matchAll(
@@ -112,6 +116,7 @@ function parseJsonLd(html) {
   return result;
 }
 
+// mirrors src/utils/urlExtract.js
 function isSufficient(obj) {
   return !!(obj.name && (obj.color || obj.l));
 }
@@ -231,23 +236,26 @@ export default async function handler(req, res) {
 
   // Fetch HTML (5s timeout, 150KB max)
   let html = "";
-  try {
+  {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const fetchRes = await fetch(cleanUrl, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent":      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
-        "Accept":          "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-      redirect: "follow",
-    });
+    try {
+      const fetchRes = await fetch(cleanUrl, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent":      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+          "Accept":          "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        redirect: "follow",
+      });
+      const buf = await fetchRes.arrayBuffer();
+      html = new TextDecoder().decode(buf.slice(0, 150 * 1024));
+    } catch {
+      clearTimeout(timer);
+      return res.status(422).json({ error: "Could not fetch product page", partial: {} });
+    }
     clearTimeout(timer);
-    const buf = await fetchRes.arrayBuffer();
-    html = new TextDecoder().decode(buf.slice(0, 150 * 1024));
-  } catch {
-    return res.status(422).json({ error: "Could not fetch product page", partial: {} });
   }
 
   // Stage 1: OG + JSON-LD (zero AI cost)
