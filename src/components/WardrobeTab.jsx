@@ -268,6 +268,7 @@ export default function WardrobeTab({
     setImportPartial({});
     setEditMoreOpen(false);
     setImportState("idle");
+    setConfirmForm({ n: "", col: "", c: "", b: "", l: "" });
     setAdding(false);
   }
 
