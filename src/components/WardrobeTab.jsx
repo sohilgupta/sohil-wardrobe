@@ -200,14 +200,21 @@ export default function WardrobeTab({
       img: addForm.img.trim(), notes: addForm.notes.trim(),
       l: "Base", occ: "Casual", w: "Mild", t: "Yes",
     });
-    setAdding(false);
+    handleCloseModal();
   }
 
   /* ── URL import handlers ── */
   async function handleFetch() {
     if (!importUrl.trim()) return;
     setImportState("loading");
-    const res = await fetchProductDetails(importUrl.trim());
+    let res;
+    try {
+      res = await fetchProductDetails(importUrl.trim());
+    } catch {
+      setImportPartial({});
+      setImportState("error");
+      return;
+    }
     if (res.ok) {
       const d = res.data;
       setImportResult(d);

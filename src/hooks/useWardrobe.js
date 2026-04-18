@@ -259,7 +259,7 @@ export default function useWardrobe() {
     const newItem = {
       ...item,
       id:      item.id || `local_${Date.now()}`,
-      _source: "local",
+      _source: item._source || "local",
       t:       item.t ?? "Yes",
       selected: item.selected !== undefined ? item.selected : true,
     };
