@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { fetchProductDetails } from "../utils/urlExtract";
 import { T } from "../theme";
 import { useTier, useAuth } from "../contexts/AuthContext";
 import ItemVisual from "./ItemVisual";
@@ -40,6 +41,14 @@ const selColor  = (a) => (a ? "#0F0F12" : "#C4C1BB");   // near-black / warm gra
 const selBorder = (a) => `1.5px solid ${a ? "#E8E6E1" : "#3C3C44"}`;
 const selArrow  = (a) =>
   `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='${a ? "%230F0F12" : "%23C4C1BB"}'/%3E%3C/svg%3E")`;
+
+/* ─── URL import — static options ────────────────────────────────────────── */
+const COLOR_OPTIONS = [
+  "Black","White","Navy Blue","Blue","Grey","Beige","Camel","Brown",
+  "Khaki","Burgundy","Red","Green","Pink","Yellow","Orange","Purple",
+  "Olive Green","Charcoal","Cream","Stone",
+];
+const LAYER_OPTIONS = ["Base", "Mid", "Outer", "Bottom", "Footwear"];
 
 /* ─── sync status badge ──────────────────────────────────────────────────── */
 function SyncBadge({ status, lastSync, onSync }) {
@@ -118,6 +127,14 @@ export default function WardrobeTab({
   const [addForm,   setAddForm]   = useState({ n: "", b: "", col: "", c: "", img: "", notes: "" });
   const [confirmDel, setConfirmDel] = useState(false);
 
+  /* ── URL import state ── */
+  const [importUrl,     setImportUrl]     = useState("");
+  const [importState,   setImportState]   = useState("idle"); // idle|loading|confirm|error|manual
+  const [importResult,  setImportResult]  = useState(null);
+  const [importPartial, setImportPartial] = useState({});
+  const [confirmForm,   setConfirmForm]   = useState({ n: "", col: "", c: "", b: "", l: "" });
+  const [editMoreOpen,  setEditMoreOpen]  = useState(false);
+
   /* ── filtered list ── */
   const f = useMemo(
     () =>
@@ -183,6 +200,74 @@ export default function WardrobeTab({
       img: addForm.img.trim(), notes: addForm.notes.trim(),
       l: "Base", occ: "Casual", w: "Mild", t: "Yes",
     });
+    setAdding(false);
+  }
+
+  /* ── URL import handlers ── */
+  async function handleFetch() {
+    if (!importUrl.trim()) return;
+    setImportState("loading");
+    const res = await fetchProductDetails(importUrl.trim());
+    if (res.ok) {
+      const d = res.data;
+      setImportResult(d);
+      setConfirmForm({
+        n:   d.name  || "",
+        col: d.color || "",
+        c:   d.c     || cats[0] || "Shirts",
+        b:   d.brand || "",
+        l:   d.l     || "Base",
+      });
+      setEditMoreOpen(false);
+      setImportState("confirm");
+    } else {
+      setImportPartial(res.partial || {});
+      setImportState("error");
+    }
+  }
+
+  function handleConfirmAdd() {
+    if (!confirmForm.n.trim()) return;
+    if (wardrobe.length >= limits.wardrobe) {
+      window.dispatchEvent(new CustomEvent("vesti-limit-reached", { detail: { type: "wardrobe" } }));
+      return;
+    }
+    onAdd?.({
+      n:          confirmForm.n.trim(),
+      b:          confirmForm.b.trim(),
+      col:        confirmForm.col || "Black",
+      c:          confirmForm.c  || "Shirts",
+      l:          confirmForm.l  || "Base",
+      img:        importResult?.image || "",
+      productUrl: importResult?.productUrl || "",
+      _source:    "url_import",
+      t:          "Yes",
+    });
+    handleCloseModal();
+  }
+
+  function handleCompleteDetails() {
+    setAddForm({
+      n:     importPartial.name  || "",
+      b:     importPartial.brand || "",
+      col:   importPartial.color || "",
+      c:     importPartial.c     || cats[0] || "Shirts",
+      img:   importPartial.image || "",
+      notes: "",
+    });
+    setImportUrl("");
+    setImportResult(null);
+    setImportPartial({});
+    setEditMoreOpen(false);
+    setImportState("manual");
+  }
+
+  function handleCloseModal() {
+    setImportUrl("");
+    setImportResult(null);
+    setImportPartial({});
+    setEditMoreOpen(false);
+    setImportState("idle");
     setAdding(false);
   }
 
@@ -486,32 +571,311 @@ export default function WardrobeTab({
 
       {/* ── Add Item modal ── */}
       {adding && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
-          onClick={() => setAdding(false)}>
-          <div style={{ background: T.surface, borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto" }}
-            onClick={(e) => e.stopPropagation()}>
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", zIndex: 300, display: "flex", alignItems: "flex-end", justifyContent: "center" }}
+          onClick={handleCloseModal}
+        >
+          <div
+            style={{ background: T.surface, borderRadius: "20px 20px 0 0", padding: 24, width: "100%", maxWidth: 520, maxHeight: "90vh", overflowY: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <p style={{ fontSize: 15, fontWeight: 700, color: T.text, marginBottom: 16 }}>Add Item</p>
-            <Field label="Name *"    value={addForm.n}     onChange={(v) => setAddForm((p) => ({ ...p, n: v }))}     placeholder="e.g. Zara Black Tee" />
-            <Field label="Brand"     value={addForm.b}     onChange={(v) => setAddForm((p) => ({ ...p, b: v }))}     placeholder="Brand" />
-            <Field label="Color"     value={addForm.col}   onChange={(v) => setAddForm((p) => ({ ...p, col: v }))}   placeholder="e.g. Black" />
-            <Field label="Image URL" value={addForm.img}   onChange={(v) => setAddForm((p) => ({ ...p, img: v }))}   placeholder="https://…" />
-            <Field label="Notes"     value={addForm.notes} onChange={(v) => setAddForm((p) => ({ ...p, notes: v }))} placeholder="Optional notes" type="textarea" />
 
-            <div style={{ marginBottom: 14 }}>
-              <label style={{ fontSize: 10, fontWeight: 600, color: T.light, letterSpacing: 0.8, display: "block", marginBottom: 4 }}>CATEGORY</label>
-              <select value={addForm.c} onChange={(e) => setAddForm((p) => ({ ...p, c: e.target.value }))}
-                style={{ ...INPUT, appearance: "auto", color: T.text }}>
-                {cats.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
+            {/* ── IDLE: URL input + "Add manually" ── */}
+            {importState === "idle" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ background: T.alt, border: `1.5px solid ${T.border}`, borderRadius: 12, padding: "10px 14px" }}>
+                  <p style={{ fontSize: 9, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 6 }}>PASTE PRODUCT LINK</p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="url"
+                      value={importUrl}
+                      onChange={(e) => setImportUrl(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && importUrl.trim() && handleFetch()}
+                      placeholder="https://www.zara.com/…"
+                      style={{ ...INPUT, flex: 1, padding: "7px 10px", fontSize: 12, background: "transparent", border: "none", outline: "none" }}
+                    />
+                    <button
+                      onClick={handleFetch}
+                      disabled={!importUrl.trim()}
+                      style={{
+                        padding: "6px 14px", borderRadius: 20, fontSize: 11, fontWeight: 700, border: "none",
+                        cursor: importUrl.trim() ? "pointer" : "default",
+                        background: importUrl.trim() ? T.accent : T.border,
+                        color: importUrl.trim() ? "#fff" : T.light,
+                        flexShrink: 0, whiteSpace: "nowrap",
+                      }}
+                    >
+                      Fetch
+                    </button>
+                  </div>
+                </div>
 
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => setAdding(false)} style={{ flex: 1, padding: 11, background: "none", border: `1.5px solid ${T.border}`, borderRadius: 12, fontSize: 13, color: T.mid, cursor: "pointer" }}>Cancel</button>
-              <button onClick={saveAdd} disabled={!addForm.n.trim()}
-                style={{ flex: 2, padding: 11, background: addForm.n.trim() ? T.text : T.border, border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, color: addForm.n.trim() ? T.bg : T.light, cursor: addForm.n.trim() ? "pointer" : "default" }}>
-                Add Item
-              </button>
-            </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ flex: 1, height: 1, background: T.border }} />
+                  <span style={{ fontSize: 10, color: T.light }}>OR</span>
+                  <div style={{ flex: 1, height: 1, background: T.border }} />
+                </div>
+
+                <button
+                  onClick={() => setImportState("manual")}
+                  style={{ width: "100%", padding: 11, background: "none", border: `1.5px solid ${T.border}`, borderRadius: 12, fontSize: 13, color: T.mid, cursor: "pointer", fontWeight: 600 }}
+                >
+                  + Add manually
+                </button>
+              </div>
+            )}
+
+            {/* ── LOADING: skeleton shimmer ── */}
+            {importState === "loading" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ background: T.alt, border: `1.5px solid ${T.border}`, borderRadius: 12, padding: "10px 14px" }}>
+                  <p style={{ fontSize: 9, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 6 }}>PASTE PRODUCT LINK</p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: T.light, flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                      {importUrl}
+                    </span>
+                    <span style={{ padding: "5px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: T.border, color: T.light, flexShrink: 0 }}>Fetch</span>
+                  </div>
+                </div>
+                <div style={{ background: T.alt, border: `1.5px solid ${T.border}`, borderRadius: 12, overflow: "hidden" }}>
+                  <div style={{ display: "flex", gap: 12, padding: "12px 14px", alignItems: "flex-start" }}>
+                    <div style={{ width: 80, height: 100, borderRadius: 10, flexShrink: 0, background: `linear-gradient(90deg,${T.surface} 25%,${T.border} 50%,${T.surface} 75%)`, backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                    <div style={{ flex: 1, paddingTop: 4, display: "flex", flexDirection: "column", gap: 8 }}>
+                      {[60, 85, 55, 45].map((w, i) => (
+                        <div key={i} style={{ height: i === 3 ? 20 : i === 1 ? 14 : 8, borderRadius: i === 3 ? 20 : 4, width: `${w}%`, background: `linear-gradient(90deg,${T.surface} 25%,${T.border} 50%,${T.surface} 75%)`, backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{ height: 1, background: T.border, margin: "0 14px" }} />
+                  <div style={{ padding: "14px", display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${T.border}`, borderTopColor: T.accent, flexShrink: 0, animation: "spin 0.9s linear infinite" }} />
+                    <div>
+                      <p style={{ fontSize: 12, fontWeight: 600, color: T.text, marginBottom: 2 }}>Analyzing product…</p>
+                      <p style={{ fontSize: 10, color: T.light }}>Extracting details from page</p>
+                    </div>
+                  </div>
+                  <div style={{ padding: "0 14px 12px", display: "flex", flexDirection: "column", gap: 7 }}>
+                    {[null, null].map((_, i) => (
+                      <div key={i} style={{ height: 32, borderRadius: 8, background: `linear-gradient(90deg,${T.surface} 25%,${T.border} 50%,${T.surface} 75%)`, backgroundSize: "200% 100%", animation: "shimmer 1.4s infinite" }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── CONFIRM: confirmation card ── */}
+            {importState === "confirm" && importResult && (
+              <div style={{ background: T.alt, border: `1.5px solid ${T.accentBorder}`, borderRadius: 12, overflow: "hidden" }}>
+                <div style={{ display: "flex", gap: 12, padding: "12px 14px", alignItems: "flex-start" }}>
+                  {importResult.image ? (
+                    <img
+                      src={importResult.image}
+                      alt={confirmForm.n}
+                      style={{ width: 80, height: 100, objectFit: "cover", borderRadius: 10, flexShrink: 0 }}
+                      onError={(e) => { e.target.style.display = "none"; }}
+                    />
+                  ) : (
+                    <div style={{ width: 80, height: 100, borderRadius: 10, flexShrink: 0, background: "linear-gradient(145deg,#1B2A4A,#374151)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 28 }}>
+                      🧥
+                    </div>
+                  )}
+                  <div style={{ flex: 1, minWidth: 0, paddingTop: 2 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, marginBottom: 5 }}>
+                      <span style={{ fontSize: 8.5, fontWeight: 700, background: "rgba(74,222,128,0.12)", color: "#4ADE80", border: "1px solid rgba(74,222,128,0.25)", padding: "2px 7px", borderRadius: 20 }}>✓ Detected</span>
+                      <span style={{ fontSize: 9, color: T.light }}>
+                        {(() => { try { return new URL(importResult.productUrl).hostname.replace(/^www\./, ""); } catch { return ""; } })()}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 3, lineHeight: 1.3 }}>{confirmForm.n || "—"}</p>
+                    <p style={{ fontSize: 11, color: T.mid, marginBottom: 6 }}>{[confirmForm.b, confirmForm.col, confirmForm.l].filter(Boolean).join(" · ")}</p>
+                    <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                      {confirmForm.c && <span style={{ fontSize: 8.5, fontWeight: 700, background: T.accentDim, color: "#60A5FA", border: `1px solid ${T.accentBorder}`, padding: "2px 7px", borderRadius: 20 }}>{confirmForm.c}</span>}
+                      {confirmForm.l && <span style={{ fontSize: 8.5, fontWeight: 700, background: "rgba(167,139,250,0.1)", color: "#A78BFA", border: "1px solid rgba(167,139,250,0.2)", padding: "2px 7px", borderRadius: 20 }}>{confirmForm.l}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ height: 1, background: T.border, margin: "0 14px" }} />
+
+                <div style={{ padding: "10px 14px", display: "flex", flexDirection: "column", gap: 7 }}>
+                  <div>
+                    <p style={{ fontSize: 8.5, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 3 }}>NAME</p>
+                    <input
+                      type="text"
+                      value={confirmForm.n}
+                      onChange={(e) => setConfirmForm((p) => ({ ...p, n: e.target.value }))}
+                      style={{ ...INPUT, padding: "7px 10px", fontSize: 12, border: `1.5px solid ${T.accentBorder}` }}
+                    />
+                  </div>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                    <div>
+                      <p style={{ fontSize: 8.5, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 3 }}>COLOR</p>
+                      <select
+                        value={confirmForm.col}
+                        onChange={(e) => setConfirmForm((p) => ({ ...p, col: e.target.value }))}
+                        style={{ ...INPUT, padding: "7px 10px", fontSize: 11, appearance: "auto", color: T.text }}
+                      >
+                        {COLOR_OPTIONS.map((c) => <option key={c}>{c}</option>)}
+                        {confirmForm.col && !COLOR_OPTIONS.includes(confirmForm.col) && (
+                          <option value={confirmForm.col}>{confirmForm.col}</option>
+                        )}
+                      </select>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 8.5, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 3 }}>CATEGORY</p>
+                      <select
+                        value={confirmForm.c}
+                        onChange={(e) => setConfirmForm((p) => ({ ...p, c: e.target.value }))}
+                        style={{ ...INPUT, padding: "7px 10px", fontSize: 11, appearance: "auto", color: T.text }}
+                      >
+                        {cats.map((c) => <option key={c}>{c}</option>)}
+                        {confirmForm.c && !cats.includes(confirmForm.c) && (
+                          <option value={confirmForm.c}>{confirmForm.c}</option>
+                        )}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setEditMoreOpen((p) => !p)}
+                    style={{ background: "none", border: "none", padding: "2px 0", display: "flex", alignItems: "center", gap: 4, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    <span style={{ fontSize: 10, color: T.light, fontWeight: 600 }}>Edit more</span>
+                    <span style={{ fontSize: 10, color: T.light }}>{editMoreOpen ? "⌄" : "›"}</span>
+                  </button>
+
+                  {editMoreOpen && (
+                    <div style={{ borderTop: `1px dashed ${T.border}`, paddingTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+                      <div>
+                        <p style={{ fontSize: 8.5, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 3 }}>BRAND</p>
+                        <input
+                          type="text"
+                          value={confirmForm.b}
+                          onChange={(e) => setConfirmForm((p) => ({ ...p, b: e.target.value }))}
+                          style={{ ...INPUT, padding: "7px 10px", fontSize: 11 }}
+                        />
+                      </div>
+                      <div>
+                        <p style={{ fontSize: 8.5, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 3 }}>LAYER</p>
+                        <select
+                          value={confirmForm.l}
+                          onChange={(e) => setConfirmForm((p) => ({ ...p, l: e.target.value }))}
+                          style={{ ...INPUT, padding: "7px 10px", fontSize: 11, appearance: "auto", color: T.text }}
+                        >
+                          {LAYER_OPTIONS.map((l) => <option key={l}>{l}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ borderTop: `1px solid ${T.border}`, display: "grid", gridTemplateColumns: "1fr 2fr" }}>
+                  <button onClick={handleCloseModal} style={{ padding: 12, background: "none", border: "none", borderRight: `1px solid ${T.border}`, fontSize: 12, color: T.mid, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                  <button
+                    onClick={handleConfirmAdd}
+                    disabled={!confirmForm.n.trim()}
+                    style={{ padding: 12, background: confirmForm.n.trim() ? T.text : T.border, border: "none", fontSize: 13, fontWeight: 700, color: confirmForm.n.trim() ? T.bg : T.light, cursor: confirmForm.n.trim() ? "pointer" : "default", fontFamily: "inherit" }}
+                  >
+                    Confirm & Add
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ── ERROR: smart fallback card ── */}
+            {importState === "error" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ background: T.alt, border: `1.5px solid ${T.border}`, borderRadius: 12, padding: "10px 14px" }}>
+                  <p style={{ fontSize: 9, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 6 }}>PASTE PRODUCT LINK</p>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <span style={{ fontSize: 11, color: T.light, flex: 1, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{importUrl}</span>
+                    <button
+                      onClick={() => setImportState("idle")}
+                      style={{ padding: "5px 12px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: T.accentDim, color: T.accent, border: `1px solid ${T.accentBorder}`, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap", fontFamily: "inherit" }}
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+
+                <div style={{ background: T.alt, border: "1.5px solid rgba(248,113,113,0.25)", borderRadius: 12, overflow: "hidden" }}>
+                  <div style={{ padding: "16px 14px", display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <div style={{ width: 40, height: 40, background: "rgba(248,113,113,0.1)", borderRadius: 10, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", border: "1px solid rgba(248,113,113,0.2)", fontSize: 18 }}>
+                      ⚠
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: T.text, marginBottom: 4, lineHeight: 1.3 }}>Couldn't detect all details</p>
+                      <p style={{ fontSize: 11, color: T.mid, lineHeight: 1.5 }}>
+                        {Object.keys(importPartial).length > 0
+                          ? "We found some info — fill in the rest below."
+                          : "This site may block automated reads. Add details manually instead."}
+                      </p>
+                    </div>
+                  </div>
+
+                  {Object.keys(importPartial).length > 0 && (
+                    <>
+                      <div style={{ height: 1, background: T.border, margin: "0 14px" }} />
+                      <div style={{ padding: "10px 14px" }}>
+                        <p style={{ fontSize: 9, fontWeight: 700, color: T.light, letterSpacing: 1, marginBottom: 7 }}>WHAT WE FOUND</p>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                          {["name", "brand", "color", "l"].map((field) => (
+                            <div key={field} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                              {importPartial[field] ? (
+                                <>
+                                  <span style={{ fontSize: 10, color: "#4ADE80" }}>✓</span>
+                                  <span style={{ fontSize: 11, color: T.mid }}>
+                                    {field.charAt(0).toUpperCase() + field.slice(1)}: <span style={{ color: T.text }}>{importPartial[field]}</span>
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span style={{ fontSize: 10, color: "#F87171" }}>✕</span>
+                                  <span style={{ fontSize: 11, color: T.light }}>{field.charAt(0).toUpperCase() + field.slice(1)}: not detected</span>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <div style={{ borderTop: `1px solid ${T.border}`, display: "grid", gridTemplateColumns: "1fr 1fr" }}>
+                    <button onClick={handleCloseModal} style={{ padding: 12, background: "none", border: "none", borderRight: `1px solid ${T.border}`, fontSize: 12, color: T.mid, cursor: "pointer", fontFamily: "inherit" }}>Cancel</button>
+                    <button onClick={handleCompleteDetails} style={{ padding: 12, background: T.text, border: "none", fontSize: 13, fontWeight: 700, color: T.bg, cursor: "pointer", fontFamily: "inherit" }}>Complete details</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── MANUAL: standard form ── */}
+            {importState === "manual" && (
+              <>
+                <Field label="Name *"    value={addForm.n}     onChange={(v) => setAddForm((p) => ({ ...p, n: v }))}     placeholder="e.g. Zara Black Tee" />
+                <Field label="Brand"     value={addForm.b}     onChange={(v) => setAddForm((p) => ({ ...p, b: v }))}     placeholder="Brand" />
+                <Field label="Color"     value={addForm.col}   onChange={(v) => setAddForm((p) => ({ ...p, col: v }))}   placeholder="e.g. Black" />
+                <Field label="Image URL" value={addForm.img}   onChange={(v) => setAddForm((p) => ({ ...p, img: v }))}   placeholder="https://…" />
+                <Field label="Notes"     value={addForm.notes} onChange={(v) => setAddForm((p) => ({ ...p, notes: v }))} placeholder="Optional notes" type="textarea" />
+                <div style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 10, fontWeight: 600, color: T.light, letterSpacing: 0.8, display: "block", marginBottom: 4 }}>CATEGORY</label>
+                  <select value={addForm.c} onChange={(e) => setAddForm((p) => ({ ...p, c: e.target.value }))}
+                    style={{ ...INPUT, appearance: "auto", color: T.text }}>
+                    {cats.map((c) => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button onClick={handleCloseModal} style={{ flex: 1, padding: 11, background: "none", border: `1.5px solid ${T.border}`, borderRadius: 12, fontSize: 13, color: T.mid, cursor: "pointer" }}>Cancel</button>
+                  <button onClick={saveAdd} disabled={!addForm.n.trim()}
+                    style={{ flex: 2, padding: 11, background: addForm.n.trim() ? T.text : T.border, border: "none", borderRadius: 12, fontSize: 13, fontWeight: 700, color: addForm.n.trim() ? T.bg : T.light, cursor: addForm.n.trim() ? "pointer" : "default" }}>
+                    Add Item
+                  </button>
+                </div>
+              </>
+            )}
+
           </div>
         </div>
       )}

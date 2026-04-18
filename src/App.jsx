@@ -142,6 +142,8 @@ function AuthenticatedApp({ onLogout }) {
         @keyframes slideUp{from{transform:translateY(30px);opacity:0}to{transform:translateY(0);opacity:1}}
         @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
         @keyframes slideUpFade{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        @keyframes spin{to{transform:rotate(360deg)}}
         .wardrobe-card{transition:transform 0.18s ease,box-shadow 0.18s ease;border-radius:16px;}
         .wardrobe-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,0.5);}
         .nav-tab{transition:background 0.15s;}
