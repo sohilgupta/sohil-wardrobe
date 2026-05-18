@@ -5,33 +5,33 @@ export function driveImg(fileId) {
   return `/api/image?id=${fileId}`;
 }
 
-/* ─── DARK THEME TOKENS ────────────────────────────────────────────────────── */
+/* ─── THEME TOKENS — resolve to CSS variables defined in styles/themes.css ──── */
 export const T = {
-  bg: "#0F0F12",
-  surface: "#1A1A1F",
-  alt: "#232329",
-  border: "#2E2E36",
-  borderLight: "#26262E",
-  text: "#E8E6E1",
-  mid: "#8A8780",
-  light: "#5C5A55",
-  green: "#4ADE80",
-  accent:       "#0A84FF",
-  accentDim:    "rgba(10,132,255,0.12)",
-  accentBorder: "rgba(10,132,255,0.25)",
+  bg:           "var(--bg)",
+  surface:      "var(--surface)",
+  alt:          "var(--alt)",
+  border:       "var(--border)",
+  borderLight:  "var(--border-light)",
+  text:         "var(--text)",
+  mid:          "var(--mid)",
+  light:        "var(--light)",
+  green:        "var(--green)",
+  accent:       "var(--accent)",
+  accentDim:    "var(--accent-dim)",
+  accentBorder: "var(--accent-border)",
   weather: {
-    Cold: ["#1E3A5F", "#93C5FD"],
-    Mild: ["#14532D", "#4ADE80"],
-    Warm: ["#78350F", "#FBBF24"],
+    Cold: ["var(--weather-cold-bg)", "var(--weather-cold-fg)"],
+    Mild: ["var(--weather-mild-bg)", "var(--weather-mild-fg)"],
+    Warm: ["var(--weather-warm-bg)", "var(--weather-warm-fg)"],
   },
   occ: {
-    Casual: ["#27272A", "#A1A1AA"],
-    Dinner: ["#4A1942", "#F9A8D4"],
-    Flight: ["#1E3A5F", "#93C5FD"],
-    Hiking: ["#14532D", "#4ADE80"],
-    Gym: ["#431407", "#FB923C"],
-    Formal: ["#2E1065", "#A78BFA"],
-    Show:   ["#3B1A5A", "#C084FC"],
+    Casual: ["var(--occ-casual-bg)", "var(--occ-casual-fg)"],
+    Dinner: ["var(--occ-dinner-bg)", "var(--occ-dinner-fg)"],
+    Flight: ["var(--occ-flight-bg)", "var(--occ-flight-fg)"],
+    Hiking: ["var(--occ-hiking-bg)", "var(--occ-hiking-fg)"],
+    Gym:    ["var(--occ-gym-bg)",    "var(--occ-gym-fg)"],
+    Formal: ["var(--occ-formal-bg)", "var(--occ-formal-fg)"],
+    Show:   ["var(--occ-show-bg)",   "var(--occ-show-fg)"],
   },
 };
 
