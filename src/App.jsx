@@ -147,7 +147,7 @@ function AuthenticatedApp({ onLogout }) {
         @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
         @keyframes spin{to{transform:rotate(360deg)}}
         .wardrobe-card{transition:transform 0.18s ease,box-shadow 0.18s ease;border-radius:16px;}
-        .wardrobe-card:hover{transform:translateY(-3px);box-shadow:0 12px 32px rgba(0,0,0,0.5);}
+        .wardrobe-card:hover{transform:translateY(-3px);box-shadow:var(--shadow-card-hover);}
         .nav-tab{transition:background 0.15s;}
       `}</style>
 
