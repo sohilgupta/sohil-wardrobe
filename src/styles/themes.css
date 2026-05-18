@@ -1,0 +1,77 @@
+/* src/styles/themes.css
+ * Design tokens for light (default) and dark themes.
+ * Toggled via document.documentElement.dataset.theme = "dark" | "light".
+ */
+
+:root {
+  /* Surfaces — parchment cream */
+  --bg: #F5EFE4;
+  --surface: #FAF5EA;
+  --alt: #EDE6D6;
+  --border: #D9CFB8;
+  --border-light: #E5DCC6;
+
+  /* Text — warm brown */
+  --text: #3A2F22;
+  --mid: #6B5E4A;
+  --light: #9C8E76;
+
+  /* Accent — warm rust (shared across themes for brand continuity) */
+  --accent: #B5532A;
+  --accent-dim: rgba(181, 83, 42, 0.10);
+  --accent-border: rgba(181, 83, 42, 0.30);
+  --green: #3F7A4A;
+
+  /* Shadows */
+  --shadow-card-hover: 0 12px 32px rgba(58, 47, 34, 0.18);
+
+  /* Weather tuples [bg, fg] */
+  --weather-cold-bg: #DDE7F2;  --weather-cold-fg: #2C4A6E;
+  --weather-mild-bg: #DDEAD8;  --weather-mild-fg: #2F5A3A;
+  --weather-warm-bg: #F3E1C8;  --weather-warm-fg: #7A4A1C;
+
+  /* Occasion tuples [bg, fg] */
+  --occ-casual-bg: #E5DECC;    --occ-casual-fg: #5A4E3A;
+  --occ-dinner-bg: #F0DDE6;    --occ-dinner-fg: #7A2C5A;
+  --occ-flight-bg: #DDE7F2;    --occ-flight-fg: #2C4A6E;
+  --occ-hiking-bg: #DDEAD8;    --occ-hiking-fg: #2F5A3A;
+  --occ-gym-bg:    #F3DEC8;    --occ-gym-fg:    #8A4318;
+  --occ-formal-bg: #E0D5EC;    --occ-formal-fg: #4A2E7A;
+  --occ-show-bg:   #E5D5EC;    --occ-show-fg:   #5A2E7A;
+}
+
+[data-theme="dark"] {
+  --bg: #141210;
+  --surface: #1C1A18;
+  --alt: #26241F;
+  --border: #34322C;
+  --border-light: #2A2825;
+
+  --text: #E8E6E1;
+  --mid: #8A8780;
+  --light: #5C5A55;
+
+  --accent: #B5532A;
+  --accent-dim: rgba(181, 83, 42, 0.16);
+  --accent-border: rgba(181, 83, 42, 0.32);
+  --green: #4ADE80;
+
+  --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.5);
+
+  --weather-cold-bg: #1E3A5F;  --weather-cold-fg: #93C5FD;
+  --weather-mild-bg: #14532D;  --weather-mild-fg: #4ADE80;
+  --weather-warm-bg: #78350F;  --weather-warm-fg: #FBBF24;
+
+  --occ-casual-bg: #27272A;    --occ-casual-fg: #A1A1AA;
+  --occ-dinner-bg: #4A1942;    --occ-dinner-fg: #F9A8D4;
+  --occ-flight-bg: #1E3A5F;    --occ-flight-fg: #93C5FD;
+  --occ-hiking-bg: #14532D;    --occ-hiking-fg: #4ADE80;
+  --occ-gym-bg:    #431407;    --occ-gym-fg:    #FB923C;
+  --occ-formal-bg: #2E1065;    --occ-formal-fg: #A78BFA;
+  --occ-show-bg:   #3B1A5A;    --occ-show-fg:   #C084FC;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
