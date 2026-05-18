@@ -5,6 +5,7 @@ import useWardrobe from "./hooks/useWardrobe";
 import useOutfits from "./hooks/useOutfits";
 import useCapsule from "./hooks/useCapsule";
 import useProfile from "./hooks/useProfile";
+import useThemeMode from "./hooks/useThemeMode";
 import WardrobeTab from "./components/WardrobeTab";
 import TripTab from "./components/TripTab";
 import OutfitTab from "./components/OutfitTab";
@@ -37,6 +38,7 @@ export default function App() {
 /* ─── INNER — reads auth state after provider is mounted ──────────────────── */
 function AppInner() {
   const { loading, signOut } = useAuth();
+  const { mode, toggle } = useThemeMode();
 
   if (loading) {
     return (
@@ -180,6 +182,27 @@ function AuthenticatedApp({ onLogout }) {
               )}
             </div>
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <button
+                onClick={toggle}
+                title={mode === "light" ? "Switch to dark mode" : "Switch to light mode"}
+                aria-label="Toggle theme"
+                style={{
+                  background: "none",
+                  border: `1px solid ${T.border}`,
+                  borderRadius: "50%",
+                  width: 30,
+                  height: 30,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: T.mid,
+                  fontSize: 14,
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {mode === "light" ? "🌙" : "☀"}
+              </button>
               <div style={{ textAlign: "right" }}>
                 <p style={{ fontSize: 16, fontWeight: 800, color: T.text, lineHeight: 1, letterSpacing: -0.4 }}>{wardrobe.length}</p>
                 <p style={{ fontSize: 8, color: T.light, letterSpacing: 1.5, marginTop: 1, fontWeight: 600, textTransform: "uppercase" }}>Items</p>
