@@ -38,7 +38,6 @@ export default function App() {
 /* ─── INNER — reads auth state after provider is mounted ──────────────────── */
 function AppInner() {
   const { loading, signOut } = useAuth();
-  const { mode, toggle } = useThemeMode();
 
   if (loading) {
     return (
@@ -58,6 +57,7 @@ function AppInner() {
 
 /* ─── AUTHENTICATED APP — only mounts after auth check passes ─────────────── */
 function AuthenticatedApp({ onLogout }) {
+  const { mode, toggle } = useThemeMode();
   const [tab, setTab] = useState("wardrobe");
   const [focusDayId, setFocusDayId] = useState(null);
   const { isPro, tier, isGuest } = useTier();
