@@ -36,11 +36,12 @@ const selStyle = {
   backgroundPosition: "right 10px center",
   outline: "none",
 };
-const selBg     = (a) => (a ? "#E8E6E1" : "#26262B");   // neutral off-white / dark
-const selColor  = (a) => (a ? "#0F0F12" : "#C4C1BB");   // near-black / warm gray
-const selBorder = (a) => `1.5px solid ${a ? "#E8E6E1" : "#3C3C44"}`;
-const selArrow  = (a) =>
-  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='${a ? "%230F0F12" : "%23C4C1BB"}'/%3E%3C/svg%3E")`;
+const selBg     = (a) => (a ? "var(--text)" : "var(--alt)");
+const selColor  = (a) => (a ? "var(--bg)"   : "var(--mid)");
+const selBorder = (a) => `1.5px solid ${a ? "var(--text)" : "var(--border)"}`;
+const selArrow  = () =>
+  // Neutral mid-gray arrow — readable on both light --alt and dark --alt.
+  `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23888888'/%3E%3C/svg%3E")`;
 
 /* ─── URL import — static options ────────────────────────────────────────── */
 const COLOR_OPTIONS = [
