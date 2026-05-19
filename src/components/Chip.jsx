@@ -1,6 +1,6 @@
 /* ─── CHIP BADGE ───────────────────────────────────────────────────────────── */
 export default function Chip({ text, colors }) {
-  const [bg, fg] = colors || ["#2A2A30", "#9A9890"];
+  const [bg, fg] = colors || ["var(--alt)", "var(--mid)"];
   return (
     <span
       style={{
