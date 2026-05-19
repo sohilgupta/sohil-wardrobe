@@ -527,8 +527,8 @@ export default function WardrobeTab({
                 </div>
 
                 {confirmDel ? (
-                  <div style={{ background: "#2A1A1A", border: `1.5px solid #7F1D1D`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
-                    <p style={{ fontSize: 13, color: "#FCA5A5", marginBottom: 8, fontWeight: 600 }}>Delete this item locally?</p>
+                  <div style={{ background: T.danger.bg, border: `1.5px solid ${T.danger.border}`, borderRadius: 12, padding: 14, marginBottom: 12 }}>
+                    <p style={{ fontSize: 13, color: T.danger.fg, marginBottom: 8, fontWeight: 600 }}>Delete this item locally?</p>
                     <p style={{ fontSize: 11, color: T.mid, marginBottom: 12, lineHeight: 1.5 }}>This is a local-only change and won't modify the Google Sheet.</p>
                     <div style={{ display: "flex", gap: 8 }}>
                       <button onClick={() => setConfirmDel(false)} style={{ flex: 1, padding: 9, background: "none", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 12, color: T.mid, cursor: "pointer" }}>Cancel</button>
@@ -537,7 +537,7 @@ export default function WardrobeTab({
                   </div>
                 ) : (
                   <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                    <button onClick={() => setConfirmDel(true)} style={{ flex: 1, padding: 10, background: "none", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 12, color: "#F87171", cursor: "pointer" }}>🗑 Delete</button>
+                    <button onClick={() => setConfirmDel(true)} style={{ flex: 1, padding: 10, background: "none", border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 12, color: T.danger.fg, cursor: "pointer" }}>🗑 Delete</button>
                     <button onClick={startEdit} style={{ flex: 2, padding: 10, background: T.alt, border: `1.5px solid ${T.border}`, borderRadius: 10, fontSize: 12, color: T.text, cursor: "pointer", fontWeight: 600 }}>✎ Edit</button>
                   </div>
                 )}

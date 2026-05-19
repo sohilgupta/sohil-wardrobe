@@ -19,6 +19,11 @@ export const T = {
   accent:       "var(--accent)",
   accentDim:    "var(--accent-dim)",
   accentBorder: "var(--accent-border)",
+  danger:  { bg: "var(--danger-bg)",  border: "var(--danger-border)",  fg: "var(--danger-fg)"  },
+  warning: { bg: "var(--warning-bg)", border: "var(--warning-border)", fg: "var(--warning-fg)" },
+  success: { bg: "var(--success-bg)", border: "var(--success-border)", fg: "var(--success-fg)" },
+  info:    { bg: "var(--info-bg)",    border: "var(--info-border)",    fg: "var(--info-fg)"    },
+  teal:    { bg: "var(--teal-bg)",    border: "var(--teal-border)",    fg: "var(--teal-fg)"    },
   weather: {
     Cold: ["var(--weather-cold-bg)", "var(--weather-cold-fg)"],
     Mild: ["var(--weather-mild-bg)", "var(--weather-mild-fg)"],

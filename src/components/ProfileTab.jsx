@@ -119,14 +119,14 @@ export default function ProfileTab({ photos, onAdd, onRemove, onClearAll, maxPho
       {!isPro && (
         <div
           style={{
-            background: "#1A1520",
-            border: `1px solid #3B1A5A`,
+            background: T.info.bg,
+            border: `1px solid ${T.info.border}`,
             borderRadius: 10,
             padding: "14px 16px",
             marginBottom: 20,
           }}
         >
-          <p style={{ fontSize: 11, color: "#C084FC", fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
+          <p style={{ fontSize: 11, color: T.info.fg, fontWeight: 700, letterSpacing: 1, marginBottom: 8 }}>
             {tier === "guest" ? "GUEST LIMITS" : "FREE TIER LIMITS"}
           </p>
           <ul style={{ fontSize: 12, color: T.mid, lineHeight: 1.8, paddingLeft: 14 }}>
@@ -371,10 +371,10 @@ const upgradeBtn = {
   width: "100%",
   marginTop: 8,
   padding: "11px",
-  background: "#2E1065",
-  border: "1px solid #7C3AED",
+  background: T.info.bg,
+  border: `1px solid ${T.info.border}`,
   borderRadius: 8,
-  color: "#A78BFA",
+  color: T.info.fg,
   fontSize: 12,
   fontWeight: 700,
   letterSpacing: 1,

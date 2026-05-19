@@ -209,9 +209,9 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
             fontSize: 9,
             fontWeight: 700,
             letterSpacing: 1,
-            color: "#60A5FA",
-            background: "#0F172A",
-            border: "1px solid #1E293B",
+            color: T.info.fg,
+            background: T.info.bg,
+            border: `1px solid ${T.info.border}`,
             borderRadius: 20,
             padding: "3px 10px",
           }}>
@@ -279,12 +279,12 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
         {optError && (
           <div style={{
             marginTop: 10,
-            background: "#2D0A0A",
-            border: "1.5px solid #7F1D1D",
+            background: T.danger.bg,
+            border: `1.5px solid ${T.danger.border}`,
             borderRadius: 10,
             padding: "9px 12px",
             fontSize: 11,
-            color: "#FCA5A5",
+            color: T.danger.fg,
             lineHeight: 1.5,
           }}>
             ⚠ {optError}
@@ -295,17 +295,17 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
         {optResult && (
           <div style={{
             marginTop: 12,
-            background: "#0A1A10",
-            border: "1.5px solid #166534",
+            background: T.success.bg,
+            border: `1.5px solid ${T.success.border}`,
             borderRadius: 12,
             padding: "14px 16px",
           }}>
-            <p style={{ fontSize: 13, fontWeight: 700, color: "#4ADE80", marginBottom: 4 }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: T.success.fg, marginBottom: 4 }}>
               Ready to optimize!
             </p>
             <p style={{ fontSize: 12, color: T.mid, marginBottom: 12, lineHeight: 1.6 }}>
               <strong style={{ color: T.text }}>{optResult.beforeCount}</strong> unique items →{" "}
-              <strong style={{ color: "#4ADE80" }}>{optResult.afterCount}</strong> unique items
+              <strong style={{ color: T.success.fg }}>{optResult.afterCount}</strong> unique items
               {optResult.beforeCount > optResult.afterCount && (
                 <span style={{ color: "#86EFAC", marginLeft: 4 }}>
                   (save {optResult.beforeCount - optResult.afterCount} items)
@@ -342,7 +342,7 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
                   borderRadius: 10,
                   fontSize: 12,
                   fontWeight: 700,
-                  color: "#4ADE80",
+                  color: T.success.fg,
                   cursor: "pointer",
                   fontFamily: "inherit",
                 }}
@@ -589,8 +589,8 @@ export default function PackTab({ wardrobe = [], outfitIds = {}, setOutfitIds, f
                     {/* Capsule badge */}
                     <div style={{
                       flexShrink: 0, fontSize: 8, fontWeight: 700,
-                      color: "#2DD4BF", background: "#0D2E2B",
-                      border: "1px solid #14B8A6", borderRadius: 20,
+                      color: T.teal.fg, background: T.teal.bg,
+                      border: `1px solid ${T.teal.border}`, borderRadius: 20,
                       padding: "2px 7px", whiteSpace: "nowrap",
                     }}>
                       ✈ CAPSULE

@@ -158,7 +158,7 @@ export default function TripTab({
           </p>
         )}
         {aiError && (
-          <div style={{ marginTop: 10, background: "#2D0A0A", border: "1.5px solid #7F1D1D", borderRadius: 10, padding: "9px 12px", fontSize: 11, color: "#FCA5A5", display: "flex", alignItems: "flex-start", gap: 8 }}>
+          <div style={{ marginTop: 10, background: T.danger.bg, border: `1.5px solid ${T.danger.border}`, borderRadius: 10, padding: "9px 12px", fontSize: 11, color: T.danger.fg, display: "flex", alignItems: "flex-start", gap: 8 }}>
             <span>⚠</span><span>{aiError}</span>
           </div>
         )}

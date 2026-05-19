@@ -719,9 +719,9 @@ export default function OutfitsTab({
         {aiError && (
           <div style={{
             marginTop: 8,
-            background: "#2D0A0A", border: "1.5px solid #7F1D1D",
+            background: T.danger.bg, border: `1.5px solid ${T.danger.border}`,
             borderRadius: 10, padding: "10px 14px",
-            fontSize: 11, color: "#FCA5A5", lineHeight: 1.5,
+            fontSize: 11, color: T.danger.fg, lineHeight: 1.5,
             display: "flex", alignItems: "flex-start", gap: 8,
           }}>
             <span style={{ flexShrink: 0 }}>⚠</span>
@@ -844,7 +844,7 @@ export default function OutfitsTab({
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
                     <div style={{
                       width: 36, height: 36, borderRadius: "50%",
-                      background: isCurrentFrozen ? "#1E293B" : T.alt,
+                      background: isCurrentFrozen ? T.info.bg : T.alt,
                       border: `1.5px solid ${isCurrentFrozen ? "#374151" : T.border}`,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: 11, fontWeight: 700, color: T.mid,
@@ -878,7 +878,7 @@ export default function OutfitsTab({
                         cursor: "pointer", fontFamily: "inherit",
                         transition: "all 0.15s",
                         border: isCurrentFrozen ? "1.5px solid #374151" : `1.5px dashed ${T.borderLight}`,
-                        background: isCurrentFrozen ? "#1E293B" : "none",
+                        background: isCurrentFrozen ? T.info.bg : "none",
                         color: isCurrentFrozen ? "#60A5FA" : T.light,
                         display: "flex", alignItems: "center", gap: 4, whiteSpace: "nowrap",
                       }}
@@ -892,10 +892,10 @@ export default function OutfitsTab({
               {/* Frozen banner */}
               {isCurrentFrozen && (
                 <div style={{
-                  padding: "8px 16px", background: "#0F172A",
-                  borderBottom: `1px solid #1E293B`,
+                  padding: "8px 16px", background: T.info.bg,
+                  borderBottom: `1px solid ${T.info.border}`,
                   display: "flex", alignItems: "center", gap: 8,
-                  fontSize: 10, color: "#60A5FA", fontWeight: 600, letterSpacing: 0.5,
+                  fontSize: 10, color: T.info.fg, fontWeight: 600, letterSpacing: 0.5,
                 }}>
                   <span style={{ fontSize: 12 }}>🔒</span>
                   OUTFIT LOCKED · Tap FROZEN to unlock · This day is in your Packing List
@@ -1019,9 +1019,9 @@ export default function OutfitsTab({
                 {hasMissing(selectedDay.id) && (
                   <div style={{
                     marginTop: 14,
-                    background: "#2D1A0A", border: `1.5px solid #92400E`,
+                    background: T.warning.bg, border: `1.5px solid ${T.warning.border}`,
                     borderRadius: 10, padding: "10px 12px",
-                    fontSize: 11, color: "#FCD34D", lineHeight: 1.5,
+                    fontSize: 11, color: T.warning.fg, lineHeight: 1.5,
                   }}>
                     ⚠️ Some items were removed from the wardrobe.
                     {isCurrentFrozen

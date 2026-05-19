@@ -22,6 +22,13 @@
   --accent-border: rgba(181, 83, 42, 0.30);
   --green: #3F7A4A;
 
+  /* Semantic state surfaces (callouts, banners) */
+  --danger-bg: #F5E3DC;        --danger-border: #C97862;        --danger-fg: #8A3A22;
+  --warning-bg: #F5E8CC;       --warning-border: #C9A35C;       --warning-fg: #7A5A1A;
+  --success-bg: #DCEAD8;       --success-border: #6FA66B;       --success-fg: #2F5A3A;
+  --info-bg:    #DDE7F2;       --info-border:    #6E94C9;       --info-fg:    #2C4A6E;
+  --teal-bg:    #D8EBE6;       --teal-border:    #5FA89A;       --teal-fg:    #1F5A4F;
+
   /* Shadows */
   --shadow-card-hover: 0 12px 32px rgba(58, 47, 34, 0.18);
 
@@ -55,6 +62,12 @@
   --accent-dim: rgba(181, 83, 42, 0.16);
   --accent-border: rgba(181, 83, 42, 0.32);
   --green: #4ADE80;
+
+  --danger-bg: #2D0A0A;        --danger-border: #7F1D1D;        --danger-fg: #FCA5A5;
+  --warning-bg: #2D1A0A;       --warning-border: #92400E;       --warning-fg: #FBBF24;
+  --success-bg: #0A1A10;       --success-border: #14532D;       --success-fg: #4ADE80;
+  --info-bg:    #0F172A;       --info-border:    #1E3A5F;       --info-fg:    #93C5FD;
+  --teal-bg:    #0D2E2B;       --teal-border:    #115E59;       --teal-fg:    #2DD4BF;
 
   --shadow-card-hover: 0 12px 32px rgba(0, 0, 0, 0.5);
 

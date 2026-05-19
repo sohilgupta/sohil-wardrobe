@@ -224,7 +224,7 @@ export default function OutfitPreviewModal({
 
           {/* Error */}
           {error && (
-            <div style={{ marginTop: 10, background: "#2D0A0A", border: "1.5px solid #7F1D1D", borderRadius: 10, padding: "10px 14px", fontSize: 11, color: "#FCA5A5", lineHeight: 1.5 }}>
+            <div style={{ marginTop: 10, background: T.danger.bg, border: `1.5px solid ${T.danger.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 11, color: T.danger.fg, lineHeight: 1.5 }}>
               ⚠ {error}
             </div>
           )}

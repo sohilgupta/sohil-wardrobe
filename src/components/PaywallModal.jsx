@@ -155,8 +155,8 @@ export default function PaywallModal({ trigger = "default", onClose }) {
                 <span
                   style={{
                     fontSize: 9,
-                    background: "#14532D",
-                    color: "#4ADE80",
+                    background: T.success.border,
+                    color: T.success.fg,
                     padding: "2px 5px",
                     borderRadius: 4,
                     fontWeight: 700,

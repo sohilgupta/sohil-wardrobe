@@ -316,12 +316,12 @@ export default function CapsuleTab({
             onClick={handleInitFromOutfits}
             style={{
               padding: "7px 14px",
-              background: "#1E3A5F",
-              border: "1.5px solid #2563EB",
+              background: T.info.bg,
+              border: `1.5px solid ${T.info.border}`,
               borderRadius: 10,
               fontSize: 11,
               fontWeight: 700,
-              color: "#93C5FD",
+              color: T.info.fg,
               cursor: "pointer",
               fontFamily: "inherit",
               whiteSpace: "nowrap",
@@ -338,11 +338,11 @@ export default function CapsuleTab({
         <div style={{
           marginBottom: 14,
           padding: "8px 12px",
-          background: "#0F172A",
-          border: "1px solid #1E293B",
+          background: T.info.bg,
+          border: `1px solid ${T.info.border}`,
           borderRadius: 10,
           fontSize: 10,
-          color: "#60A5FA",
+          color: T.info.fg,
           display: "flex",
           alignItems: "center",
           gap: 6,
@@ -399,7 +399,7 @@ export default function CapsuleTab({
           </p>
         )}
         {aiError && (
-          <div style={{ marginTop: 8, background: "#2D0A0A", border: "1.5px solid #7F1D1D", borderRadius: 10, padding: "10px 14px", fontSize: 11, color: "#FCA5A5", lineHeight: 1.5 }}>
+          <div style={{ marginTop: 8, background: T.danger.bg, border: `1.5px solid ${T.danger.border}`, borderRadius: 10, padding: "10px 14px", fontSize: 11, color: T.danger.fg, lineHeight: 1.5 }}>
             ⚠ {aiError}
           </div>
         )}

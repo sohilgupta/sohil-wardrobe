@@ -128,12 +128,12 @@ export default function AuthPage() {
         {/* Dev-mode setup notice */}
         {!supabaseConfigured && (
           <div style={{
-            background: "#1C1508", border: "1px solid #78350F", borderRadius: 10,
-            padding: "10px 14px", marginBottom: 20, fontSize: 11, color: "#FBBF24", lineHeight: 1.6,
+            background: T.warning.bg, border: `1px solid ${T.warning.border}`, borderRadius: 10,
+            padding: "10px 14px", marginBottom: 20, fontSize: 11, color: T.warning.fg, lineHeight: 1.6,
           }}>
-            <strong>Setup required</strong> — add to <code style={{ background: "#2A1E08", padding: "1px 4px", borderRadius: 3 }}>.env.local</code>:<br />
-            <code style={{ color: "#FCD34D" }}>VITE_SUPABASE_URL</code><br />
-            <code style={{ color: "#FCD34D" }}>VITE_SUPABASE_ANON_KEY</code>
+            <strong>Setup required</strong> — add to <code style={{ background: T.warning.border, padding: "1px 4px", borderRadius: 3 }}>.env.local</code>:<br />
+            <code style={{ color: T.warning.fg }}>VITE_SUPABASE_URL</code><br />
+            <code style={{ color: T.warning.fg }}>VITE_SUPABASE_ANON_KEY</code>
           </div>
         )}
 

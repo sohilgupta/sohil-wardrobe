@@ -268,12 +268,12 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds,
           <div
             style={{
               marginTop: 10,
-              background: "#2D0A0A",
-              border: "1.5px solid #7F1D1D",
+              background: T.danger.bg,
+              border: `1.5px solid ${T.danger.border}`,
               borderRadius: 10,
               padding: "9px 12px",
               fontSize: 11,
-              color: "#FCA5A5",
+              color: T.danger.fg,
               lineHeight: 1.5,
             }}
           >
@@ -417,12 +417,12 @@ export default function OutfitTab({ wardrobe = [], outfitIds = {}, setOutfitIds,
             <div
               style={{
                 marginBottom: 12,
-                background: "#2D1A0A",
-                border: "1px solid #92400E",
+                background: T.warning.bg,
+                border: `1px solid ${T.warning.border}`,
                 borderRadius: 10,
                 padding: "8px 12px",
                 fontSize: 11,
-                color: "#FCD34D",
+                color: T.warning.fg,
                 lineHeight: 1.5,
               }}
             >
