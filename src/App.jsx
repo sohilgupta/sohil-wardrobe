@@ -153,7 +153,7 @@ function AuthenticatedApp({ onLogout }) {
 
       {/* Header */}
       <div style={{ background: T.surface, borderBottom: `1px solid ${T.borderLight}`, position: "sticky", top: 0, zIndex: 100 }}>
-        <div style={{ maxWidth: 700, margin: "0 auto", padding: "0 20px" }}>
+        <div style={{ margin: "0 auto", padding: "0 clamp(16px, 4vw, 48px)" }}>
           {/* Top bar: wordmark + stats */}
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", height: 56 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -257,7 +257,7 @@ function AuthenticatedApp({ onLogout }) {
       </div>
 
       {/* Content */}
-      <div style={{ flex: 1, maxWidth: 700, margin: "0 auto", padding: "28px 20px 60px", width: "100%" }}>
+      <div style={{ flex: 1, margin: "0 auto", padding: "28px clamp(16px, 4vw, 48px) 60px", width: "100%" }}>
         {tab === "wardrobe" && (
           <WardrobeTab
             wardrobe={wardrobe}
