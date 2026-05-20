@@ -4,7 +4,7 @@ import { driveImg } from "../theme";
 const W = [
   // OUTER
   {id:"j1", n:"Zara Black Faux Leather Jacket",  c:"Jacket",      col:"Black",        occ:"Casual", w:"Mild", l:"Outer", b:"Zara",          t:"Yes", img:"https://static.zara.net/photos///assets/public/92c4/a8b3/a2d94923b934/f174547f555a/04391400800-e1/w/704/04391400800-e1.jpg?ts=1725355672344"},
-  {id:"j2", n:"Burberry Puffer Jacket",           c:"Jacket",      col:"Black",        occ:"Casual", w:"Cold", l:"Outer", b:"Burberry",      t:"Yes", img:driveImg("1AugnirXCUPPf3WAJk-STxesZZX-SgHSR")},
+  {id:"j2", n:"Burberry Puffer Jacket",           c:"Jacket",      col:"Black",        occ:"Casual", w:"Cold", l:"Outer", b:"Burberry",      t:"Yes", img:driveImg("1UAzK0UDukAXquAVUFCGQWT__x7tbtDTB")},
   {id:"j3", n:"Uniqlo Black Fur Jacket",          c:"Jacket",      col:"Black",        occ:"Casual", w:"Cold", l:"Outer", b:"Uniqlo",        t:"No",  img:driveImg("15oXjLvIOKysDKuvw2lZw5XAl2kWINQbt")},
   {id:"j4", n:"Zara Technical Bomber Khaki",      c:"Jacket",      col:"Khaki",        occ:"Casual", w:"Mild", l:"Outer", b:"Zara",          t:"Yes", img:"https://static.zara.net/photos///2023/I/0/2/p/5070/304/505/2/w/704/5070304505_6_1_1.jpg?ts=1694439342664"},
   {id:"j5", n:"Zara Faux Suede Jacket Camel",     c:"Jacket",      col:"Camel",        occ:"Dinner", w:"Mild", l:"Outer", b:"Zara",          t:"Yes", img:"https://static.zara.net/assets/public/3ca3/b860/b0fa40d7a3e4/592a9358b1d4/08281152704-e1/08281152704-e1.jpg?ts=1764677550500&w=1920"},
