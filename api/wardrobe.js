@@ -72,7 +72,8 @@ export default async function handler(req, res) {
   }
 
   if (successCount === 0) {
-    return res.status(502).json({ error: "All wardrobe tabs failed to load" });
+    const reasons = results.map((r) => r.reason?.message).filter(Boolean).join("; ");
+    return res.status(502).json({ error: "All wardrobe tabs failed to load", detail: reasons });
   }
 
   // Private cache: 5 minutes (avoids hammering Google on every page load)

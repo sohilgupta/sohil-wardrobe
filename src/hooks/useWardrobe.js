@@ -130,6 +130,7 @@ export default function useWardrobe() {
 
   const overridesRef = useRef(loadOverrides(userId));
   const remoteRef    = useRef([]);
+  const syncRef      = useRef(null); // always points to latest sync closure
 
   /* ── sync: fetch all tabs, update cache & state ── */
   const sync = useCallback(async () => {
@@ -184,6 +185,9 @@ export default function useWardrobe() {
     }
   }, [userId, isOwner, guestId, session]);
 
+  /* ── Keep syncRef pointing to the latest sync closure ── */
+  useEffect(() => { syncRef.current = sync; }, [sync]);
+
   /* ── Re-apply overrides after one-time data migration fires ── */
   useEffect(() => {
     function handleMigration(e) {
@@ -218,15 +222,17 @@ export default function useWardrobe() {
       }
     }
 
-    sync();
-    const timer = setInterval(sync, POLL_MS);
+    syncRef.current?.();
+    // Use ref so the interval always calls the latest sync closure —
+    // prevents stale-token "Offline" after a Supabase access-token refresh.
+    const timer = setInterval(() => syncRef.current?.(), POLL_MS);
     return () => clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
   /* ── Reload on demo load/clear ── */
   useEffect(() => {
-    const handler = () => sync();
+    const handler = () => syncRef.current?.();
     window.addEventListener("vesti-demo-loaded",  handler);
     window.addEventListener("vesti-demo-cleared", handler);
     return () => {

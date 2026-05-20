@@ -2,6 +2,8 @@
   "framework": "vite",
   "functions": {
     "api/ai.js":                 { "maxDuration": 60 },
+    "api/wardrobe.js":           { "maxDuration": 30 },
+    "api/image.js":              { "maxDuration": 15 },
     "api/extract-product.js":    { "maxDuration": 20 },
     "api/stripe/checkout.js":    { "maxDuration": 30 },
     "api/stripe/webhook.js":     { "maxDuration": 30 },
