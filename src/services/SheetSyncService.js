@@ -129,6 +129,10 @@ const DISPLAY_CATEGORY_RULES = [
 ];
 
 function normalizeDisplayCategory(tabName, itemName) {
+  // Items from the Shoes tab are always footwear — skip keyword rules so names
+  // like "Running", "Training", or "Trainer" don't reroute them to Activewear.
+  if (tabName === "Shoes") return "Shoes";
+
   const lower = itemName.toLowerCase();
   for (const { label, keywords } of DISPLAY_CATEGORY_RULES) {
     if (keywords.some((kw) => lower.includes(kw))) return label;
@@ -136,7 +140,7 @@ function normalizeDisplayCategory(tabName, itemName) {
   // Tab-level fallbacks for items whose names don't match any keyword
   if (tabName === "Gym Tshirts") return "Activewear";
   if (tabName === "Thermals")    return "Base Layers";
-  return tabName; // Jackets, Shoes, Bottoms, Shirts already clean
+  return tabName; // Jackets, Bottoms, Shirts already clean
 }
 
 export function occFromTab(tab) {
