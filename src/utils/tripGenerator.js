@@ -62,13 +62,51 @@ function extractJSON(rawText) {
   return JSON.parse(rawText.slice(s, e + 1));
 }
 
-/* ── Validate a slot object (required fields + ID must exist in validIds set) */
-function validateSlot(slot, validIds) {
-  if (!slot || typeof slot !== "object") return null;
+/* ── Resolve a model-returned value to a valid wardrobe ID ─────────────────────
+   LLMs don't always echo IDs perfectly. Tolerate whitespace/case differences
+   and the model returning an item's name (or truncated name) instead of its ID.
+   Returns a valid ID from validIds, or null. */
+function resolveId(value, wardrobe, validIds) {
+  if (typeof value !== "string") return null;
+  const v = value.trim();
+  if (!v || v.toLowerCase() === "null") return null;
+  if (validIds.has(v)) return v;
+  const lower = v.toLowerCase();
+  for (const i of wardrobe) {
+    if (!validIds.has(i.id)) continue;
+    const name = i.n || "";
+    if (
+      i.id.toLowerCase() === lower ||
+      name.toLowerCase() === lower ||
+      name.slice(0, 18).toLowerCase() === lower
+    ) {
+      return i.id;
+    }
+  }
+  return null;
+}
+
+/* ── Unwrap one level of nesting if the model wrapped the outfit object
+   (e.g. {"daytime": {...}} or {"outfit": {...}} for a single-outfit request) */
+function unwrapOutfit(parsed) {
+  const hasLayers = (o) =>
+    o && typeof o === "object" && ("base" in o || "bottom" in o || "shoes" in o);
+  if (hasLayers(parsed)) return parsed;
+  if (parsed && typeof parsed === "object") {
+    for (const v of Object.values(parsed)) {
+      if (hasLayers(v)) return v;
+    }
+  }
+  return parsed || {};
+}
+
+/* ── Validate a slot object (required fields + ID must resolve in validIds) */
+function validateSlot(slot, validIds, wardrobe = []) {
+  const obj = unwrapOutfit(slot);
+  if (!obj || typeof obj !== "object") return null;
   const result = {};
   ["base", "mid", "outer", "bottom", "shoes"].forEach((layer) => {
-    const id = slot[layer];
-    result[layer] = id && validIds.has(id) ? id : null;
+    result[layer] = resolveId(obj[layer], wardrobe, validIds);
   });
   if (!result.base || !result.bottom || !result.shoes) return null;
   return result;
@@ -229,8 +267,8 @@ export async function generateTripOutfits({
       const next = { ...prev };
       Object.entries(parsed).forEach(([dayId, dayData]) => {
         if (frozenDays[dayId]) return;
-        const dt = validateSlot(dayData?.daytime, validIds);
-        const ev = validateSlot(dayData?.evening, validIds);
+        const dt = validateSlot(dayData?.daytime, validIds, wardrobe);
+        const ev = validateSlot(dayData?.evening, validIds, wardrobe);
         if (dt) {
           // Preserve any existing optional slots (breakfast/sleepwear/flight/activity)
           next[dayId] = { ...(next[dayId] || {}), daytime: dt, evening: ev };
@@ -357,14 +395,21 @@ Output ONLY a single JSON object (no markdown, no code blocks):
     featureType: "singleOutfit",
   });
 
-  const parsed = extractJSON(rawText);
+  const parsed = unwrapOutfit(extractJSON(rawText));
   const result = {};
   ["base", "mid", "outer", "bottom", "shoes"].forEach((layer) => {
-    const id = parsed[layer];
-    result[layer] = id && validIds.has(id) ? id : null;
+    result[layer] = resolveId(parsed[layer], wardrobe, validIds);
   });
 
   if (!result.base || !result.bottom || !result.shoes) {
+    // Diagnostic — surfaces WHY the outfit failed (raw model output vs the IDs
+    // it was allowed to use) in the browser console.
+    console.warn(
+      "[Vesti] AI returned an invalid outfit.\nRaw response:", rawText,
+      "\nParsed:", parsed,
+      "\nValid ID sample:", [...validIds].slice(0, 8),
+      `\n(${validIds.size} valid IDs total)`
+    );
     throw new Error("AI returned an invalid outfit. Try again.");
   }
   return result;

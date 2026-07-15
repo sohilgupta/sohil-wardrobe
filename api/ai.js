@@ -39,6 +39,8 @@ export default async function handler(req, res) {
     contents,
     generationConfig: {
       maxOutputTokens: max_tokens || 8000,
+      // Force valid JSON output (no markdown fences / prose to strip)
+      responseMimeType: "application/json",
       // Disable thinking tokens — we need pure JSON output, not reasoning text
       thinkingConfig: { thinkingBudget: 0 },
     },
