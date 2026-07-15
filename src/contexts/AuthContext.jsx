@@ -11,7 +11,7 @@ import { supabase } from "../lib/supabase";
 import { clearAllAICaches } from "../utils/aiCache";
 import { migrateLocalData } from "../utils/dataMigration";
 import { migrateGuestData } from "../utils/guestMigration";
-import { resolveTier, LIMITS } from "../utils/tiers";
+import { resolveTier, LIMITS, OWNER_EMAIL } from "../utils/tiers";
 import useGuestSession from "../hooks/useGuestSession";
 
 const AuthContext = createContext(null);
@@ -55,9 +55,16 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     if (!supabaseUrl) {
-      // Dev mode: treat as owner Pro account
-      setUser({ id: "local-dev", email: "sohilgupta@gmail.com" });
-      setProfile({ plan: "pro", subscription_status: "active" });
+      if (import.meta.env.DEV) {
+        // Local dev only: treat as owner Pro account for convenience.
+        setUser({ id: "local-dev", email: OWNER_EMAIL });
+        setProfile({ plan: "pro", subscription_status: "active" });
+      } else {
+        // Production with missing Supabase config: FAIL CLOSED.
+        // Never impersonate the owner — a misconfigured build must not expose
+        // the owner's wardrobe to anonymous visitors. Fall back to guest.
+        ensureGuestId();
+      }
       setLoading(false);
       return;
     }
