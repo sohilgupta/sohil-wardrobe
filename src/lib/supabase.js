@@ -46,3 +46,16 @@ export const supabase = isConfigured
   : noopClient;
 
 export { isConfigured as supabaseConfigured };
+
+/* ── Auth header for gated API routes (/api/ai, /api/preview, /api/profile) ──
+   Returns { Authorization: "Bearer <token>" } for the signed-in Supabase user,
+   or {} when there's no session (guest) — the server then replies 401. */
+export async function authHeader() {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}

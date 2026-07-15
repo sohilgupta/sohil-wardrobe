@@ -22,7 +22,7 @@
    Response: { imageUrl: string }  — data URI (data:image/...;base64,...)
    ─────────────────────────────────────────────────────────────────────────── */
 
-import { requireAuth } from "../lib/auth.js";
+import { requireSupabaseAuth } from "../lib/auth.js";
 
 export const maxDuration = 120;
 
@@ -158,7 +158,7 @@ async function tryImagen4(apiKey, prompt) {
 /* ── Main handler ─────────────────────────────────────────────────────────── */
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
-  if (!requireAuth(req, res)) return;
+  if (!(await requireSupabaseAuth(req, res))) return;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {

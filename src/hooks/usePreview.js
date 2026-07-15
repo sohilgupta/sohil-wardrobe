@@ -17,6 +17,7 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 import { useState, useCallback } from "react";
+import { authHeader }            from "../lib/supabase";
 import { enforceRateLimit }     from "../utils/aiRateLimit";
 import { logAICall }            from "../utils/aiLogger";
 
@@ -139,7 +140,7 @@ export default function usePreview() {
 
       const res = await fetch("/api/preview", {
         method:  "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
         body: JSON.stringify({
           location,
           activity,

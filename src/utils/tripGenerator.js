@@ -18,6 +18,7 @@
    ─────────────────────────────────────────────────────────────────────────── */
 
 import TRIP from "../data/trip";
+import { authHeader }                       from "../lib/supabase";
 import { getCached, setCached, inputHash }  from "./aiCache";
 import { enforceRateLimit }                 from "./aiRateLimit";
 import { logAICall }                        from "./aiLogger";
@@ -28,7 +29,7 @@ async function callAI({ system, userContent, maxTokens = 8000, featureType = "un
 
   const res = await fetch("/api/ai", {
     method:  "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
     body: JSON.stringify({
       model:      "gemini-2.5-flash",
       max_tokens: maxTokens,

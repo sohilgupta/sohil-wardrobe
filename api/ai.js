@@ -7,7 +7,7 @@
    Requires a valid session cookie.
    ─────────────────────────────────────────────────────────────────────────── */
 
-import { requireAuth } from "../lib/auth.js";
+import { requireSupabaseAuth } from "../lib/auth.js";
 
 export const maxDuration = 60; // seconds — Gemini can take 20-30s for a full trip
 
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  if (!requireAuth(req, res)) return;
+  if (!(await requireSupabaseAuth(req, res))) return;
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {

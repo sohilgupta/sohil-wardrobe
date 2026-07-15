@@ -9,7 +9,7 @@
    Max 5 photos × ~250KB compressed = ~1.25MB per user — well within KV limits.
    ─────────────────────────────────────────────────────────────────────────── */
 
-import { requireAuth } from "../lib/auth.js";
+import { requireSupabaseAuth } from "../lib/auth.js";
 
 export const config = {
   api: { bodyParser: { sizeLimit: "8mb" } },
@@ -49,7 +49,7 @@ async function kvSet(key, value) {
 }
 
 export default async function handler(req, res) {
-  if (!requireAuth(req, res)) return;
+  if (!(await requireSupabaseAuth(req, res))) return;
 
   if (!KV_URL || !KV_TOKEN) {
     return res.status(503).json({ error: "Backend sync not configured", local: true });

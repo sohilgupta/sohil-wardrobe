@@ -3,10 +3,12 @@
    The Anthropic API key lives in the environment — never in the browser.
    ─────────────────────────────────────────────────────────────────────────── */
 
+import { authHeader } from "../lib/supabase";
+
 async function callAI(model, max_tokens, messages) {
   const r = await fetch("/api/ai", {
     method:  "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(await authHeader()) },
     body:    JSON.stringify({ model, max_tokens, messages }),
   });
   if (!r.ok) throw new Error(`AI proxy returned ${r.status}`);
