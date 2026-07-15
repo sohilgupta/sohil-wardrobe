@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Analytics } from "@vercel/analytics/react";
 import { T } from "./theme";
 import { AuthProvider, useAuth, useTier } from "./contexts/AuthContext";
 import useWardrobe from "./hooks/useWardrobe";
@@ -31,6 +32,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppInner />
+      <Analytics />
     </AuthProvider>
   );
 }
