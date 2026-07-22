@@ -211,6 +211,31 @@ Google Sheets automation has sharp edges; these steps avoid them.
   `productpage.<id>.html`; the product **name/color** come from that page's `og:title`;
   image `https://image.hm.com/assets/hm/<..>.jpg?imwidth=2160`.
 
+  ⚠️ **Multi-variant colour trap.** One H&M product page serves several colour
+  variants, and the **first `"colorName"` in the HTML is often the WRONG one** —
+  it belongs to a sibling variant, not the one ordered. Proximity/regex guessing
+  around the image hash does not work either (the colour labels live in a distant
+  JSON blob). Resolve it deterministically instead:
+
+  1. Take the **exact article code from the order's product link**
+     (`productpage.1347123002.html` → `1347123002`).
+  2. Fetch *that* page and read `og:title` — it is **variant-specific**
+     (`"Men's Rust red/Sun Running shorts with DryMove™"`).
+  3. Cross-check by fetching the sibling code (`…001`) and confirming it returns a
+     *different* colour. If both return the same, you fetched a redirect — recheck.
+
+  ```js
+  // returns e.g. { "1347123001": "Dark plum/Sun", "1347123002": "Rust red/Sun" }
+  for (const code of ["1347123001", "1347123002"]) {
+    const h = await (await fetch(`https://www2.hm.com/en_in/productpage.${code}.html`,
+                                 { credentials: "include" })).text();
+    console.log(code, (h.match(/property="og:title"\s+content="([^"]+)"/) || [])[1]);
+  }
+  ```
+
+  ⚠️ **H&M order pages do not show the size.** There is no size anywhere in the
+  order page text — leave column D blank rather than guessing.
+
 ## Data safety
 - This workflow only **appends** rows to the sheet. It never edits existing rows, the
   app's code, or Supabase/localStorage. If you must add rows in a tab with a `Sum =` row,
